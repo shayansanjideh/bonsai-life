@@ -36,7 +36,7 @@ if [ "${1:-}" != "--no-model" ]; then
   [ -n "${MMPROJ_PATH:-}" ] || fetch "https://huggingface.co/$REPO/resolve/main/$MMPROJ" "$PPATH"
 
   CMD=("$SERVER" -m "$MPATH" --mmproj "$PPATH" -ngl "$NGL" -c "${CTX:-4096}" -np 1 --port "$LPORT" --host 127.0.0.1
-       --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5)
+       --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --image-min-tokens "${IMAGE_MIN_TOKENS:-1024}")
   # Small Linux boxes: cap memory so the model can never OOM the machine.
   if [ "$OS" = "Linux" ] && command -v systemd-run >/dev/null && [ "$(awk '/MemTotal/{print $2}' /proc/meminfo)" -lt 4000000 ]; then
     CMD=(systemd-run --scope --quiet -p MemoryMax="${MEMMAX:-1100M}" nice -n 19 "${CMD[@]}")
