@@ -12,7 +12,13 @@ Four universes evolve side by side. A deterministic `alive_score` (the fraction 
 
 The "AI slot wins" counter shows how often Bonsai's edit beats random mutation. Click a quadrant to crown it yourself. Click a matrix cell to raise the champion's attraction, or shift-click to lower it.
 
-## Run it
+## Play it in the browser
+
+Open the hosted page and press **Wake Bonsai in this browser**. Bonsai 2B runs on your GPU through WebGPU, using PrismML's engine from their Talk app (`web/vendor/bonsai.mjs`, Apache-2.0). The first visit downloads about 794 MB of weights from Hugging Face; later visits load them from the browser cache. Without WebGPU, the sim still runs and an offline naturalist writes the notes.
+
+Any static HTTPS host works: serve the `web/` folder.
+
+## Run it locally with llama-server
 
 ```bash
 ./start.sh            # downloads PrismML's llama.cpp build + PQ2_0 weights + Q8_0 mmproj, starts everything
