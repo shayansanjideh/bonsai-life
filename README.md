@@ -1,0 +1,30 @@
+# Bonsai-Life
+
+A particle-life breeder that runs in your browser, with [Ternary-Bonsai-2-2B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf) as the resident naturalist.
+
+Four universes evolve side by side. A deterministic `alive_score` (the fraction of particles in clumps times how fast those clumps move together) picks each generation's winner. Bonsai looks at a snapshot of the winner, gives it a species name and field notes, and proposes 2-4 attraction-matrix edits toward your goal.
+
+| Slot | What it is |
+|---|---|
+| A | the champion, unchanged |
+| B | the champion plus Bonsai's proposed edits |
+| C, D | the champion plus random Gaussian mutations |
+
+The "AI slot wins" counter shows how often Bonsai's edit beats random mutation. Click a quadrant to crown it yourself. Click a matrix cell to raise the champion's attraction, or shift-click to lower it.
+
+## Run it
+
+```bash
+./start.sh            # downloads PrismML's llama.cpp build + PQ2_0 weights + Q8_0 mmproj, starts everything
+./start.sh --no-model # simulation + offline naturalist only
+```
+
+Then open http://localhost:8000. On Apple Silicon the model runs on Metal. On Linux it uses CUDA if `nvidia-smi` exists, and the CPU otherwise.
+
+Overrides: `MODEL_PATH`, `MMPROJ_PATH`, `LLAMA_SERVER`, `PORT`, `LLAMA_PORT`, `PRISM_TAG`.
+
+## How it fits together
+
+- `web/index.html`: the simulation (spatial-hash particle life, 6 species, 1,100 particles per universe), rendering, the evolution loop and the UI, with no dependencies.
+- `server.py`: serves the page and proxies `/api/naturalist` to llama-server with `enable_thinking: false` and a JSON schema, then validates the edits.
+- If Bonsai takes longer than 8 s, the next generation starts with a random B, and Bonsai's edits are hot-swapped into B as soon as they arrive.
