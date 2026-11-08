@@ -5,54 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bonsai-Life</title>
 <style>
-:root{--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--bad:#ff5c7a}
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--neg:#ff5c7a;--pos:#4dc3ff}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px;max-width:1400px;margin:0 auto}
-@media (max-width:980px){.app{grid-template-columns:1fr}}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+@media (max-width:1000px){.app{grid-template-columns:1fr}}
 header{grid-column:1/-1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;letter-spacing:.3px}
+header h1{font-size:20px;margin:0}
 header .sub{color:var(--muted);font-size:13px}
+header a{color:var(--muted);font-size:12px}
 .status{margin-left:auto;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .status.on{color:var(--accent);border-color:#2b6b45}
-.status.off{color:var(--warn);border-color:#6b5426}
-.wake{display:flex;flex-direction:column;gap:8px}
-.wake p{margin:0;font-size:12px;color:var(--muted)}
-.wake .prog{flex:none}
-.stage{position:relative;width:100%;aspect-ratio:1;max-width:820px;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
-.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
-.bar{display:flex;align-items:center;gap:10px;margin:10px 0 0;flex-wrap:wrap;max-width:820px}
-.prog{flex:1;min-width:120px;height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
-.prog>div{height:100%;width:0;background:var(--accent);transition:width .1s linear}
-.hint{color:var(--muted);font-size:12px}
 main{min-width:0}
+.stage{position:relative;width:100%;aspect-ratio:1;max-width:860px;max-height:calc(100vh - 140px);background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.hint{color:var(--muted);font-size:12px;margin-top:8px;max-width:860px}
 aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 8px}
-input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
-.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 8px;font-weight:600}
 button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
 button:hover{border-color:#3a4a63}
 button.primary{background:#1d3b2a;border-color:#2b6b45;color:var(--accent)}
-.pill{border-radius:999px;font-size:12px;padding:4px 10px}
+button:disabled{opacity:.6;cursor:default}
 .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.feed{max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:8px}
-.entry{background:var(--panel2);border-radius:8px;padding:8px 10px;border-left:3px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--panel2);border-radius:8px;padding:6px 8px}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+canvas.spark{width:100%;height:64px;display:block;margin-top:8px}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.lineages{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.lin{display:grid;grid-template-columns:12px minmax(0,1fr) 46px;gap:8px;align-items:center;font-size:12px}
+.lin .sw{width:12px;height:12px;border-radius:50%}
+.lin .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lin .nm em{color:var(--text)}
+.lin .bar{height:4px;background:var(--panel2);border-radius:2px;margin-top:2px;overflow:hidden}
+.lin .bar div{height:100%}
+.lin .pc{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+canvas.brain{width:100%;height:230px;display:block}
+.cellinfo{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.cellinfo b{color:var(--text);font-weight:600}
+.feed{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.entry{background:var(--panel2);border-radius:8px;padding:8px 10px;border-left:3px solid var(--line);font-size:13px}
 .entry.ai{border-left-color:var(--accent)}
-.entry .top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
-.entry .name{font-style:italic;font-weight:600;color:var(--text);font-size:14px;margin:2px 0}
-.entry .notes{font-size:13px}
-.entry .edits{font-size:12px;color:var(--muted);margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.entry .top{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}
 .tag{font-size:11px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
-.tag.ai{color:var(--accent);border-color:#2b6b45}.tag.off{color:var(--warn);border-color:#6b5426}
-.heat{display:grid;grid-template-columns:22px repeat(6,1fr);gap:3px;font-size:11px;user-select:none}
-.heat div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:4px}
-.heat .cell{cursor:pointer;font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#fff;text-shadow:0 0 3px #000}
-.dot{width:12px;height:12px;border-radius:50%;margin:auto}
-.stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
-.stats b{color:var(--text);font-weight:600}
-.saved{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow:auto;margin-top:8px}
-.saved button{text-align:left;font-size:12px}
+.tag.ai{color:var(--accent);border-color:#2b6b45}
+.prog{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.prog>div{height:100%;width:0;background:var(--accent)}
+p.small{margin:0;font-size:12px;color:var(--muted)}
 label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 </style>
 </head>
@@ -60,404 +62,405 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
 <div class="app">
   <header>
     <h1>Bonsai-Life</h1>
-    <span class="sub">Particle-life breeder. The math picks winners; Ternary-Bonsai-2-2B names them and proposes edits.</span>
-    <span id="status" class="status">checking model…</span>
+    <span class="sub">Every cell runs its own tiny neural network. Brains that find food get passed on, with mutations.</span>
+    <a href="breeder.html">Matrix breeder →</a>
+    <span id="status" class="status">narrator: offline</span>
   </header>
 
   <main>
-    <div class="stage" id="stage"><canvas id="cv"></canvas></div>
-    <div class="bar">
-      <span id="genLabel" class="hint">Gen 1</span>
-      <div class="prog"><div id="prog"></div></div>
-      <span id="phase" class="hint">simulating</span>
-    </div>
-    <div class="bar hint">A = champion (elite) · B = AI-proposed edits · C, D = random mutations · click a quadrant to crown it</div>
+    <div class="stage"><canvas id="cv"></canvas><canvas id="ov" style="pointer-events:none"></canvas></div>
+    <div class="hint">Colors are lineages: every cell starts with its own random brain, and colors merge as winning brains spread. Pale specks are food. Click any cell to see its brain think.</div>
   </main>
 
   <aside>
-    <div class="card wake" id="wakeCard">
-      <h2>Naturalist</h2>
-      <p id="wakeText">Bonsai 2B can run right here in your browser on WebGPU. The first load downloads about 794 MB from Hugging Face; after that it's cached. Until then, an offline naturalist writes the notes.</p>
-      <div class="row"><button id="wake" class="primary">Wake Bonsai in this browser</button></div>
-      <div class="prog" id="wakeProg" hidden><div id="wakeBar"></div></div>
-    </div>
     <div class="card">
-      <h2>Goal</h2>
-      <input id="goal" type="text" value="Glider worms that swim across the dish">
-      <div class="pills">
-        <button class="pill" data-goal="Glider worms that swim across the dish">Glider Worms</button>
-        <button class="pill" data-goal="Round cells with a membrane of one color around a core of another">Cell Membranes</button>
-        <button class="pill" data-goal="A chaotic spinning vortex of all colors">Chaotic Vortex</button>
-        <button class="pill" data-goal="Red predators chasing yellow prey">Predator Chase</button>
+      <h2>Evolution</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Cells</div><div class="v" id="sPop">–</div></div>
+        <div class="stat"><div class="k">Lineages alive</div><div class="v" id="sLin">–</div></div>
+        <div class="stat"><div class="k">Deepest generation</div><div class="v" id="sGen">–</div></div>
+        <div class="stat"><div class="k">Food per cell / min</div><div class="v" id="sFood">–</div></div>
+        <div class="stat"><div class="k">Steers toward food</div><div class="v" id="sAim">–</div></div>
+        <div class="stat"><div class="k">Sim time</div><div class="v" id="sTime">–</div></div>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>Controls</h2>
-      <div class="row">
-        <button id="play" class="primary">Pause evolution</button>
-        <button id="step">Step generation</button>
-        <button id="scramble">Scramble all</button>
-        <button id="save">Save organism</button>
+      <canvas class="spark" id="spark"></canvas>
+      <div class="legend"><span><i style="background:var(--accent)"></i>food per cell</span><span><i style="background:var(--pos)"></i>steers toward food</span><span><i style="background:var(--warn)"></i>scrambled brains</span></div>
+      <div class="row" style="margin-top:10px">
+        <button id="play" class="primary">Pause</button>
+        <button id="scramble" title="Replace every brain with a random one. Lineages stay; what they learned is gone.">Scramble all brains</button>
+        <button id="reset">New dish</button>
       </div>
-      <div class="row" style="margin-top:8px">
-        <label class="sl">Generation length <input id="genlen" type="range" min="3" max="15" value="6"> <span id="genlenv">6 s</span></label>
-      </div>
-      <div class="stats" style="margin-top:8px">
-        <span>Best alive <b id="best">–</b></span>
-        <span>AI slot wins <b id="aiwins">0/0</b></span>
-        <span>FPS <b id="fps">–</b></span>
-      </div>
-      <div class="saved" id="saved"></div>
+      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="1" max="8" value="3"> <span id="speedv">3×</span></label>
     </div>
 
     <div class="card">
-      <h2>Champion matrix (row attracts → column) · click +, shift-click −</h2>
-      <div class="heat" id="heat"></div>
+      <h2>Selected cell's brain</h2>
+      <div class="cellinfo" id="cellinfo">Following a cell from the leading lineage. Click any cell to switch.</div>
+      <canvas class="brain" id="brain"></canvas>
+      <p class="small">Left: what it senses. Middle: 6 hidden neurons. Right: which way it pushes. Blue lines excite, red inhibit; brightness is how strongly they're firing right now.</p>
     </div>
 
     <div class="card">
-      <h2>Field biologist log</h2>
-      <div class="feed" id="feed"></div>
+      <h2>Leading lineages</h2>
+      <div class="lineages" id="lineages"></div>
+    </div>
+
+    <div class="card">
+      <h2>Field notes</h2>
+      <p class="small" id="wakeText">Bonsai 2B can narrate from inside your browser on WebGPU. It reads the lineage stats, names species and explains what their brains learned. First load downloads about 429 MB from Hugging Face, then it's cached.</p>
+      <div class="row" style="margin-top:8px"><button id="wake" class="primary">Wake Bonsai narrator</button></div>
+      <div class="prog" id="wakeProg" hidden style="margin-top:8px"><div id="wakeBar"></div></div>
+      <div class="feed" id="feed" style="margin-top:10px"></div>
     </div>
   </aside>
 </div>
 
 <script>
 "use strict";
-// ---------------- physics (same force law and constants as the kill-test sim.py) ----------------
-const K = 6, N = 1100, RMAX = 0.08, BETA = 0.3, DT = 0.02, FRICTION = 0.85, GRID = 12;
-const COLORS = ["#ff4d6d", "#ff9f1c", "#ffe14d", "#4dff88", "#4dc3ff", "#d66bff"];
-const CNAMES = ["red", "orange", "yellow", "green", "blue", "purple"];
-const RGB = COLORS.map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
+// ======================= world =======================
+const MAXC = 1600, MAXF = 900, START = 500;
+const NI = 10, NH = 6, NO = 2, NW = NI * NH + NH * NO + NO;      // 74 numbers per brain
+const SENSE = 0.09, CROWD = 0.035, EAT = 0.009, GRID = 11;          // GRID cells of size >= SENSE
+const IN_LABELS = ["food →", "food ↓", "food near", "crowd →", "crowd ↓", "kin nearby", "energy", "my vel →", "my vel ↓", "bias"];
+const OUT_LABELS = ["push →", "push ↓"];
 
-function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-function gauss(r) { let u = 0, v = 0; while (!u) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+let rnd = mulberry(Date.now() & 0xffffffff);
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss() { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
 
-class Universe {
-  constructor(A, seed) {
-    this.A = Float32Array.from(A); const r = rng(seed);
-    this.x = new Float32Array(N); this.y = new Float32Array(N);
-    this.vx = new Float32Array(N); this.vy = new Float32Array(N); this.s = new Uint8Array(N);
-    for (let i = 0; i < N; i++) { this.x[i] = r(); this.y[i] = r(); this.s[i] = Math.floor(r() * K); }
-    this.head = new Int32Array(GRID * GRID); this.next = new Int32Array(N);
-    this.samples = []; this.origin = "random"; this.aiEdits = null;
-  }
-  copyStateFrom(u) { this.x.set(u.x); this.y.set(u.y); this.vx.set(u.vx); this.vy.set(u.vy); this.s.set(u.s); }
-  bin() {
-    const { head, next, x, y } = this; head.fill(-1);
-    for (let i = 0; i < N; i++) {
-      const c = (Math.floor(x[i] * GRID) % GRID) * GRID + (Math.floor(y[i] * GRID) % GRID);
-      next[i] = head[c]; head[c] = i;
-    }
-  }
-  step() {
-    this.bin(); const { head, next, x, y, vx, vy, s, A } = this;
-    for (let i = 0; i < N; i++) {
-      const gx = Math.floor(x[i] * GRID), gy = Math.floor(y[i] * GRID), si = s[i] * K;
-      let ax = 0, ay = 0;
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-        let j = head[((gx + dx + GRID) % GRID) * GRID + ((gy + dy + GRID) % GRID)];
-        while (j !== -1) {
-          if (j !== i) {
-            let ddx = x[j] - x[i], ddy = y[j] - y[i];
-            ddx -= Math.round(ddx); ddy -= Math.round(ddy);
-            const d2 = ddx * ddx + ddy * ddy;
-            if (d2 < RMAX * RMAX && d2 > 0) {
-              const d = Math.sqrt(d2), r = d / RMAX;
-              const f = r < BETA ? r / BETA - 1 : A[si + s[j]] * (1 - Math.abs(2 * r - 1 - BETA) / (1 - BETA));
-              ax += f * ddx / d; ay += f * ddy / d;
-            }
-          }
-          j = next[j];
-        }
-      }
-      vx[i] = vx[i] * FRICTION + ax * RMAX * 10 * DT; vy[i] = vy[i] * FRICTION + ay * RMAX * 10 * DT;
-    }
-    for (let i = 0; i < N; i++) { x[i] = ((x[i] + vx[i] * DT) % 1 + 1) % 1; y[i] = ((y[i] + vy[i] * DT) % 1 + 1) % 1; }
-  }
-  // alive_score = clustered * coherent (identical definition to the kill test)
-  measure() {
-    this.bin(); const { head, next, x, y, vx, vy } = this, R2 = 0.03 * 0.03;
-    let nClust = 0, cohSum = 0, speed = 0;
-    for (let i = 0; i < N; i++) {
-      const gx = Math.floor(x[i] * GRID), gy = Math.floor(y[i] * GRID);
-      let n = 0, mx = 0, my = 0;
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-        let j = head[((gx + dx + GRID) % GRID) * GRID + ((gy + dy + GRID) % GRID)];
-        while (j !== -1) {
-          let ddx = x[j] - x[i], ddy = y[j] - y[i]; ddx -= Math.round(ddx); ddy -= Math.round(ddy);
-          if (ddx * ddx + ddy * ddy <= R2) { n++; mx += vx[j]; my += vy[j]; }
-          j = next[j];
-        }
-      }
-      speed += Math.hypot(vx[i], vy[i]);
-      if (n >= 8) { nClust++; cohSum += Math.hypot(mx / n, my / n); }
-    }
-    const clustered = nClust / N, coherent = nClust ? cohSum / nClust : 0;
-    const m = { clustered, coherent, speed: speed / N, alive: clustered * coherent };
-    this.samples.push(m); return m;
-  }
-  score() {
-    if (!this.samples.length) return this.measure().alive;
-    return this.samples.reduce((a, m) => a + m.alive, 0) / this.samples.length;
-  }
+// cells (struct of arrays)
+const cx = new Float32Array(MAXC), cy = new Float32Array(MAXC), cvx = new Float32Array(MAXC), cvy = new Float32Array(MAXC);
+const energy = new Float32Array(MAXC), age = new Uint32Array(MAXC), gen = new Uint32Array(MAXC), lin = new Uint32Array(MAXC);
+const eaten = new Uint32Array(MAXC), kids = new Uint32Array(MAXC), uid = new Uint32Array(MAXC);
+const W = new Float32Array(MAXC * NW);
+let n = 0, nextUid = 1, nextLin = 1, steps = 0;
+// food
+const fx = new Float32Array(MAXF), fy = new Float32Array(MAXF); let nf = 0;
+const blooms = [0, 1, 2].map(() => ({ x: rnd(), y: rnd(), vx: (rnd() - .5) * 2e-4, vy: (rnd() - .5) * 2e-4 }));
+// lineage registry
+const lineages = new Map();   // id -> {hue, born, name, aiName, peak}
+// metrics
+let foodEvents = 0, aimSum = 0, aimN = 0; const history = []; const marks = [];
+let selectedUid = 0, followLin = 0, followNote = false;
+
+function newLineage() { const id = nextLin++; lineages.set(id, { id, hue: (id * 137.508) % 360, born: steps, name: latinName(id), aiName: null }); return id; }
+function addCell(x, y, e, l, g, parent) {
+  if (n >= MAXC) return -1;
+  const i = n++; cx[i] = x; cy[i] = y; cvx[i] = 0; cvy[i] = 0; energy[i] = e; age[i] = 0; gen[i] = g; lin[i] = l; eaten[i] = 0; kids[i] = 0; uid[i] = nextUid++;
+  const o = i * NW;
+  if (parent >= 0) { const p = parent * NW; for (let k = 0; k < NW; k++) W[o + k] = W[p + k] + (rnd() < 0.25 ? gauss() * 0.25 : 0); }
+  else for (let k = 0; k < NW; k++) W[o + k] = gauss() * 0.8;
+  return i;
+}
+function removeCell(i) {
+  const j = --n; if (i === j) return;
+  cx[i] = cx[j]; cy[i] = cy[j]; cvx[i] = cvx[j]; cvy[i] = cvy[j]; energy[i] = energy[j]; age[i] = age[j]; gen[i] = gen[j];
+  lin[i] = lin[j]; eaten[i] = eaten[j]; kids[i] = kids[j]; uid[i] = uid[j];
+  W.copyWithin(i * NW, j * NW, j * NW + NW);
+}
+function addFood(x, y) { if (nf >= MAXF) return; fx[nf] = ((x % 1) + 1) % 1; fy[nf] = ((y % 1) + 1) % 1; nf++; }
+function removeFood(k) { nf--; fx[k] = fx[nf]; fy[k] = fy[nf]; }
+
+function newDish() {
+  n = 0; nf = 0; steps = 0; lineages.clear(); history.length = 0; marks.length = 0; selectedUid = 0;
+  for (let i = 0; i < START; i++) addCell(rnd(), rnd(), 0.6 + rnd() * 0.3, newLineage(), 0, -1);
+  for (let i = 0; i < 500; i++) addFood(rnd(), rnd());
+  document.getElementById("feed").innerHTML = "";
+  note({ text: `New dish: ${START} cells, each with its own random ${NW}-number brain. None of them know how to find food yet.`, source: "sim" });
 }
 
-// ---------------- rendering ----------------
-const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-let W = 800, Q = 400;
-function resize() {
-  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-  W = Math.max(200, Math.round(r.width * dpr)); Q = W / 2; cv.width = W; cv.height = W;
-  ctx.fillStyle = "#0a0e14"; ctx.fillRect(0, 0, W, W);
+// ======================= brains =======================
+const inBuf = new Float32Array(NI), hidBuf = new Float32Array(NH), outBuf = new Float32Array(NO);
+function think(i, inp, hid, out) {
+  const o = i * NW;
+  for (let h = 0; h < NH; h++) { let s = 0; for (let k = 0; k < NI; k++) s += W[o + h * NI + k] * inp[k]; hid[h] = Math.tanh(s); }
+  const ob = o + NI * NH;
+  for (let q = 0; q < NO; q++) { let s = W[ob + NH * NO + q]; for (let h = 0; h < NH; h++) s += W[ob + q * NH + h] * hid[h]; out[q] = Math.tanh(s); }
 }
-window.addEventListener("resize", resize);
 
+// spatial hash for cells and food
+const cHead = new Int32Array(GRID * GRID), cNext = new Int32Array(MAXC), fHead = new Int32Array(GRID * GRID), fNext = new Int32Array(MAXF);
+const cellOf = (x, y) => (Math.floor(x * GRID) % GRID) * GRID + (Math.floor(y * GRID) % GRID);
+function rebin() {
+  cHead.fill(-1); fHead.fill(-1);
+  for (let i = 0; i < n; i++) { const c = cellOf(cx[i], cy[i]); cNext[i] = cHead[c]; cHead[c] = i; }
+  for (let k = 0; k < nf; k++) { const c = cellOf(fx[k], fy[k]); fNext[k] = fHead[c]; fHead[c] = k; }
+}
+const wrap = d => d - Math.round(d);
+
+function sense(i, inp) {
+  const gx = Math.floor(cx[i] * GRID), gy = Math.floor(cy[i] * GRID);
+  let best = 1e9, bdx = 0, bdy = 0, crx = 0, cry = 0, cn = 0, kin = 0;
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const c = ((gx + dx + GRID) % GRID) * GRID + ((gy + dy + GRID) % GRID);
+    for (let k = fHead[c]; k !== -1; k = fNext[k]) {
+      const ddx = wrap(fx[k] - cx[i]), ddy = wrap(fy[k] - cy[i]), d2 = ddx * ddx + ddy * ddy;
+      if (d2 < best) { best = d2; bdx = ddx; bdy = ddy; }
+    }
+    for (let j = cHead[c]; j !== -1; j = cNext[j]) {
+      if (j === i) continue;
+      const ddx = wrap(cx[j] - cx[i]), ddy = wrap(cy[j] - cy[i]), d2 = ddx * ddx + ddy * ddy;
+      if (d2 < CROWD * CROWD) { cn++; crx += ddx; cry += ddy; if (lin[j] === lin[i]) kin++; }
+    }
+  }
+  const d = Math.sqrt(best);
+  if (d < SENSE) { inp[0] = bdx / (d + 1e-6); inp[1] = bdy / (d + 1e-6); inp[2] = 1 - d / SENSE; } else { inp[0] = 0; inp[1] = 0; inp[2] = 0; }
+  if (cn) { const m = Math.hypot(crx, cry) + 1e-6; inp[3] = crx / m; inp[4] = cry / m; inp[5] = kin / cn; } else { inp[3] = 0; inp[4] = 0; inp[5] = 0; }
+  inp[6] = Math.min(1.5, energy[i]) / 1.5; inp[7] = cvx[i] * 250; inp[8] = cvy[i] * 250; inp[9] = 1;
+  return d < SENSE;
+}
+
+// ======================= step =======================
+const ACC = 0.00045, DAMP = 0.86, MAXV = 0.006;
+function step() {
+  steps++;
+  // food: blooms drift; most food appears near them, some anywhere
+  for (const b of blooms) { b.x = (b.x + b.vx + 1) % 1; b.y = (b.y + b.vy + 1) % 1; if (rnd() < 0.002) { b.vx = (rnd() - .5) * 2e-4; b.vy = (rnd() - .5) * 2e-4; } }
+  for (let s = 0; s < 5; s++) {
+    if (rnd() < 0.8) { const b = blooms[(rnd() * 3) | 0]; addFood(b.x + gauss() * 0.06, b.y + gauss() * 0.06); }
+    else addFood(rnd(), rnd());
+  }
+  rebin();
+  for (let i = 0; i < n; i++) {
+    const sees = sense(i, inBuf); think(i, inBuf, hidBuf, outBuf);
+    const tx = outBuf[0], ty = outBuf[1];
+    if (sees) { const m = Math.hypot(tx, ty); if (m > 0.05) { aimSum += (tx * inBuf[0] + ty * inBuf[1]) / m; aimN++; } }
+    cvx[i] = cvx[i] * DAMP + tx * ACC; cvy[i] = cvy[i] * DAMP + ty * ACC;
+    // soft personal space so cells don't stack
+    if (inBuf[2] >= 0) { /* noop: crowding handled through sensing; keep it cheap */ }
+    const sp = Math.hypot(cvx[i], cvy[i]); if (sp > MAXV) { cvx[i] *= MAXV / sp; cvy[i] *= MAXV / sp; }
+    cx[i] = (cx[i] + cvx[i] + 1) % 1; cy[i] = (cy[i] + cvy[i] + 1) % 1;
+    energy[i] -= 0.0011 + 0.0016 * (tx * tx + ty * ty);
+    age[i]++;
+  }
+  // eating (one pass over food near each cell)
+  for (let i = 0; i < n; i++) {
+    const c = cellOf(cx[i], cy[i]);
+    for (let k = fHead[c]; k !== -1; k = fNext[k]) {
+      if (fx[k] < 0) continue;
+      const ddx = wrap(fx[k] - cx[i]), ddy = wrap(fy[k] - cy[i]);
+      if (ddx * ddx + ddy * ddy < EAT * EAT) { fx[k] = -1; energy[i] = Math.min(1.6, energy[i] + 0.3); eaten[i]++; foodEvents++; }
+    }
+  }
+  for (let k = nf - 1; k >= 0; k--) if (fx[k] < 0) removeFood(k);
+  // division and death
+  for (let i = n - 1; i >= 0; i--) {
+    if (energy[i] <= 0 || age[i] > 9000) { if (rnd() < 0.5) addFood(cx[i], cy[i]); removeCell(i); continue; }
+    if (energy[i] > 1.2 && n < MAXC) {
+      energy[i] *= 0.5; kids[i]++;
+      const l = rnd() < 0.01 ? newLineage() : lin[i];
+      addCell(cx[i] + (rnd() - .5) * 0.01, cy[i] + (rnd() - .5) * 0.01, energy[i], l, gen[i] + 1, i);
+    }
+  }
+  // keep the dish from dying out entirely
+  if (n < 40) for (let i = 0; i < 40; i++) addCell(rnd(), rnd(), 0.7, newLineage(), 0, -1);
+  if (steps % 120 === 0) sample();
+}
+
+function sample() {
+  const perMin = n ? foodEvents / n * (3600 / 120) : 0;   // 60 steps = 1 s of sim time
+  history.push({ t: steps, food: perMin, aim: aimN ? aimSum / aimN : 0 });
+  if (history.length > 400) history.shift();
+  foodEvents = 0; aimSum = 0; aimN = 0;
+}
+
+// ======================= lineage stats =======================
+function lineageStats() {
+  const m = new Map();
+  for (let i = 0; i < n; i++) {
+    let s = m.get(lin[i]); if (!s) m.set(lin[i], s = { id: lin[i], count: 0, eaten: 0, age: 0, gen: 0, speed: 0 });
+    s.count++; s.eaten += eaten[i]; s.age += age[i]; s.gen = Math.max(s.gen, gen[i]); s.speed += Math.hypot(cvx[i], cvy[i]);
+  }
+  for (const id of [...lineages.keys()]) if (!m.has(id)) lineages.delete(id);
+  return [...m.values()].sort((a, b) => b.count - a.count);
+}
+const GEN_A = ["Vermis", "Natator", "Globulus", "Cursor", "Venator", "Errans", "Cellula", "Spira", "Lucidus", "Vorax", "Sitiens", "Quaerens", "Nomas", "Pabulator"];
+const EPI_A = ["fluorescens", "rapax", "gregarius", "solitarius", "velox", "tardus", "famelicus", "audax", "timidus", "pulsans", "vagans", "sagax", "obscurus", "aureus"];
+function latinName(id) { const g = GEN_A.length, e = EPI_A.length, k = Math.floor(id / (g * e)); return `${GEN_A[id % g]} ${EPI_A[Math.floor(id / g) % e]}${k ? " " + (k + 1) : ""}`; }
+const linName = id => { const L = lineages.get(id); return L ? (L.aiName || L.name) : "extinct"; };
+const linColor = (id, l = 60) => { const L = lineages.get(id); return `hsl(${L ? L.hue : 0} 90% ${l}%)`; };
+
+// ======================= rendering =======================
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), ov = document.getElementById("ov"), octx = ov.getContext("2d");
+let S = 800;
+function resize() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); S = Math.max(200, Math.round(Math.min(r.width, r.height) * d)); cv.width = S; cv.height = S; ov.width = S; ov.height = S; }
+addEventListener("resize", resize);
 function draw() {
-  ctx.fillStyle = "rgba(10,14,20,0.22)"; ctx.fillRect(0, 0, W, W);
-  const ps = Math.max(1.5, Q / 210);
-  for (let q = 0; q < 4; q++) {
-    const u = U[q], ox = (q % 2) * Q, oy = Math.floor(q / 2) * Q;
-    for (let c = 0; c < K; c++) {
-      ctx.fillStyle = COLORS[c];
-      for (let i = 0; i < N; i++) if (u.s[i] === c) ctx.fillRect(ox + u.x[i] * Q - ps / 2, oy + u.y[i] * Q - ps / 2, ps, ps);
-    }
+  ctx.fillStyle = "rgba(10,14,20,0.35)"; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = "rgba(255,244,214,0.8)"; const fs = Math.max(1.5, S / 450);
+  for (let k = 0; k < nf; k++) ctx.fillRect(fx[k] * S - fs / 2, fy[k] * S - fs / 2, fs, fs);
+  const r = Math.max(2, S / 260); octx.clearRect(0, 0, S, S);
+  let sel = -1;
+  for (let i = 0; i < n; i++) {
+    if (uid[i] === selectedUid) sel = i;
+    ctx.fillStyle = linColor(lin[i], 45 + Math.min(1, energy[i]) * 25);
+    ctx.beginPath(); ctx.arc(cx[i] * S, cy[i] * S, r, 0, 6.2832); ctx.fill();
   }
-  // grid lines + badges
-  ctx.fillStyle = "#243044"; ctx.fillRect(Q - 1, 0, 2, W); ctx.fillRect(0, Q - 1, W, 2);
-  const fs = Math.round(Q / 22);
-  ctx.font = `600 ${fs}px ui-sans-serif,system-ui,sans-serif`; ctx.textBaseline = "top";
-  for (let q = 0; q < 4; q++) {
-    const u = U[q], ox = (q % 2) * Q, oy = Math.floor(q / 2) * Q, sc = u.samples.length ? u.score() : null;
-    const lab = `${"ABCD"[q]} · ${u.origin === "ai" ? "AI" : u.origin}${sc !== null ? " · " + sc.toFixed(2) : ""}`;
-    const w = ctx.measureText(lab).width + fs;
-    ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(ox + 8, oy + 8, w, fs * 1.6);
-    ctx.fillStyle = u.origin === "ai" ? "#4dff88" : "#e6edf3"; ctx.fillText(lab, ox + 8 + fs / 2, oy + 8 + fs * 0.3);
-    if (q === winnerFlash.q && performance.now() < winnerFlash.until) {
-      ctx.strokeStyle = "#4dff88"; ctx.lineWidth = Math.max(3, Q / 80); ctx.strokeRect(ox + 3, oy + 3, Q - 6, Q - 6);
-    }
-    if (q === forced) { ctx.strokeStyle = "#ffb84d"; ctx.lineWidth = Math.max(3, Q / 80); ctx.setLineDash([12, 8]); ctx.strokeRect(ox + 3, oy + 3, Q - 6, Q - 6); ctx.setLineDash([]); }
+  if (sel >= 0) {
+    const x = cx[sel] * S, y = cy[sel] * S, c = octx;
+    c.strokeStyle = "#fff"; c.lineWidth = Math.max(1.5, S / 500); c.beginPath(); c.arc(x, y, r * 3.2, 0, 6.2832); c.stroke();
+    c.globalAlpha = 0.3; c.setLineDash([4, 6]); c.beginPath(); c.arc(x, y, SENSE * S, 0, 6.2832); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+    sense(sel, inBuf);
+    if (inBuf[2] > 0) { const d = (1 - inBuf[2]) * SENSE * S; c.strokeStyle = "#fff4d6"; c.beginPath(); c.moveTo(x, y); c.lineTo(x + inBuf[0] * d, y + inBuf[1] * d); c.stroke(); }
+  } else if (n) {
+    // the followed cell died (or none chosen yet): follow a relative, else the most successful lineage
+    let pick = -1; const want = followLin;
+    for (let i = 0; i < n; i++) if (lin[i] === want) { pick = i; break; }
+    if (pick < 0) { const L = lineageStats(); for (let i = 0; i < n; i++) if (lin[i] === L[0].id) { pick = i; break; } }
+    if (pick >= 0) { if (selectedUid) followNote = true; selectedUid = uid[pick]; followLin = lin[pick]; }
   }
+  return sel;
 }
 
-function snapshotBlob(q) {
-  const off = document.createElement("canvas"); off.width = off.height = 384;
-  off.getContext("2d").drawImage(cv, (q % 2) * Q, Math.floor(q / 2) * Q, Q, Q, 0, 0, 384, 384);
-  return new Promise(res => off.toBlob(res, "image/png"));
-}
-function snapshot(q) {
-  const off = document.createElement("canvas"); off.width = off.height = 384;
-  off.getContext("2d").drawImage(cv, (q % 2) * Q, Math.floor(q / 2) * Q, Q, Q, 0, 0, 384, 384);
-  return off.toDataURL("image/png");
-}
-
-// ---------------- evolution ----------------
-const R = rng(Date.now() & 0xffffffff);
-let U = [], gen = 1, champion = null, forced = -1, running = true, genSteps = 0, genLen = 6 * 60, aiWins = 0, aiTotal = 0, best = 0;
-let pendingAI = null, waiting = false, modelOnline = false;
-const winnerFlash = { q: -1, until: 0 };
-
-function randomMatrix() { return Array.from({ length: K * K }, () => R() * 2 - 1); }
-function mutate(A, sigma) { return A.map(a => clamp(a + gauss(R) * sigma, -1, 1)); }
-function applyEdits(A, edits) { const B = Array.from(A); for (const e of edits) B[e.source * K + e.target] = clamp(e.attraction, -1, 1); return B; }
-
-function freshGeneration(A0) {
-  U = [0, 1, 2, 3].map(q => { const u = new Universe(q === 0 ? A0 : mutate(A0, 0.35), (R() * 1e9) | 0); u.origin = q === 0 ? "elite" : "random"; return u; });
-  champion = { A: Array.from(A0) };
-}
-function scrambleAll() {
-  U = [0, 1, 2, 3].map(() => { const u = new Universe(randomMatrix(), (R() * 1e9) | 0); u.origin = "random"; return u; });
-  champion = { A: Array.from(U[0].A) }; genSteps = 0; forced = -1; renderHeat();
-}
-
-let aiBusy = false, WAIT_MS = 8000;
-function endGeneration() {
-  const scores = U.map(u => u.score());
-  const w = forced >= 0 ? forced : scores.indexOf(Math.max(...scores));
-  const win = U[w]; forced = -1;
-  winnerFlash.q = w; winnerFlash.until = performance.now() + 1500;
-  if (U[1].origin === "ai") { aiTotal++; if (w === 1) aiWins++; }
-  best = Math.max(best, scores[w]);
-  champion = { A: Array.from(win.A), score: scores[w], origin: win.origin, q: w };
-  updateStats();
-  const g = gen, goal = document.getElementById("goal").value.trim() || "anything lifelike";
-  const finish = res => {
-    logEntry(g, w, scores[w], win.origin, res);
-    breed(win, res); renderHeat(); gen++; genSteps = 0; waiting = false; setPhase("simulating");
+// brain view
+const bc = document.getElementById("brain"), bctx = bc.getContext("2d");
+function drawBrain(i) {
+  const d = Math.min(2, devicePixelRatio || 1), w = bc.clientWidth * d, h = bc.clientHeight * d;
+  if (bc.width !== w || bc.height !== h) { bc.width = w; bc.height = h; }
+  bctx.clearRect(0, 0, w, h);
+  if (i < 0) return;
+  const inp = new Float32Array(NI), hid = new Float32Array(NH), out = new Float32Array(NO);
+  sense(i, inp); think(i, inp, hid, out);
+  const fsz = 11 * d, xi = 78 * d, xh = w * 0.55, xo = w - 96 * d;
+  const yi = k => 10 * d + (h - 20 * d) * (k + .5) / NI, yh = k => 10 * d + (h - 20 * d) * (k + .5) / NH, yo = k => h / 2 + (k - .5) * 60 * d;
+  const o = i * NW, ob = o + NI * NH;
+  const edge = (x1, y1, x2, y2, wt, act) => {
+    const a = Math.min(1, Math.abs(wt * act)) * 0.85 + 0.05;
+    bctx.strokeStyle = wt >= 0 ? `rgba(77,195,255,${a})` : `rgba(255,92,122,${a})`; bctx.lineWidth = Math.min(3, 0.4 + Math.abs(wt)) * d;
+    bctx.beginPath(); bctx.moveTo(x1, y1); bctx.lineTo(x2, y2); bctx.stroke();
   };
-  if (!modelOnline) return finish(offlineNaturalist(champion, goal));
-  if (aiBusy) { finish({ species_name: "", field_notes: "", edits: [], source: "busy" }); return; }
-  // Ask Bonsai. Keep simulating while it looks; if it answers within WAIT_MS it seeds slot B now,
-  // otherwise breed with a random B and hot-swap the AI edits into B as soon as they arrive.
-  const img = browserModel ? snapshotBlob(w) : snapshot(w), parentA = Array.from(win.A);
-  waiting = true; setPhase("Bonsai is looking…"); aiBusy = true;
-  let done = false;
-  const req = askModel(img, parentA, goal).finally(() => { aiBusy = false; });
-  req.then(res => {
-    if (!done) { done = true; clearTimeout(timer); return finish(res || offlineNaturalist(champion, goal)); }
-    if (!res) return;
-    if (gen === g + 1 && U[0] && arraysEqual(U[0].A, parentA)) {
-      const u = new Universe(applyEdits(parentA, res.edits), (R() * 1e9) | 0); u.copyStateFrom(U[0]); u.origin = "ai";
-      U[1] = u; logEntry(g, w, scores[w], win.origin, { ...res, late: true });
-    } else logEntry(g, w, scores[w], win.origin, { ...res, late: true, stale: true });
-  });
-  const timer = setTimeout(() => {
-    if (done) return; done = true;
-    finish({ species_name: "", field_notes: "", edits: [], source: "pending" });
-  }, WAIT_MS);
+  for (let hh = 0; hh < NH; hh++) for (let k = 0; k < NI; k++) edge(xi, yi(k), xh, yh(hh), W[o + hh * NI + k], inp[k]);
+  for (let q = 0; q < NO; q++) for (let hh = 0; hh < NH; hh++) edge(xh, yh(hh), xo, yo(q), W[ob + q * NH + hh], hid[hh]);
+  const node = (x, y, v) => { bctx.fillStyle = v >= 0 ? `rgba(77,195,255,${0.25 + 0.75 * Math.min(1, v)})` : `rgba(255,92,122,${0.25 + 0.75 * Math.min(1, -v)})`; bctx.beginPath(); bctx.arc(x, y, 5.5 * d, 0, 6.2832); bctx.fill(); bctx.strokeStyle = "#8b98a9"; bctx.lineWidth = d; bctx.stroke(); };
+  bctx.font = `${fsz}px ui-sans-serif,system-ui,sans-serif`; bctx.textBaseline = "middle";
+  for (let k = 0; k < NI; k++) { node(xi, yi(k), inp[k]); bctx.fillStyle = "#8b98a9"; bctx.textAlign = "right"; bctx.fillText(IN_LABELS[k], xi - 9 * d, yi(k)); }
+  for (let hh = 0; hh < NH; hh++) node(xh, yh(hh), hid[hh]);
+  for (let q = 0; q < NO; q++) { node(xo, yo(q), out[q]); bctx.fillStyle = "#e6edf3"; bctx.textAlign = "left"; bctx.fillText(`${OUT_LABELS[q]} ${out[q] >= 0 ? "+" : ""}${out[q].toFixed(2)}`, xo + 9 * d, yo(q)); }
+  const info = document.getElementById("cellinfo");
+  info.innerHTML = `<span><b style="color:${linColor(lin[i])}">${esc(linName(lin[i]))}</b></span><span>generation <b>${gen[i]}</b></span><span>energy <b>${energy[i].toFixed(2)}</b></span><span>ate <b>${eaten[i]}</b></span><span>children <b>${kids[i]}</b></span>${followNote ? "<span>(the cell you picked died; following a relative)</span>" : ""}`;
 }
-function arraysEqual(a, b) { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 1e-6) return false; return true; }
+cv.addEventListener("click", e => {
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  let best = 1e9, bi = -1;
+  for (let i = 0; i < n; i++) { const d = wrap(cx[i] - x) ** 2 + wrap(cy[i] - y) ** 2; if (d < best) { best = d; bi = i; } }
+  if (bi >= 0) { selectedUid = uid[bi]; followLin = lin[bi]; followNote = false; }
+});
 
-function breed(win, res) {
-  const A0 = Array.from(win.A), parent = win;
-  const next = [0, 1, 2, 3].map(q => {
-    let A, origin;
-    if (q === 0) { A = A0; origin = "elite"; }
-    else if (q === 1 && res && res.edits && res.edits.length) { A = applyEdits(A0, res.edits); origin = res.source === "ai" ? "ai" : "random"; }
-    else { A = mutate(A0, 0.35); origin = "random"; }
-    const u = new Universe(A, (R() * 1e9) | 0); u.copyStateFrom(parent); u.origin = origin; return u;
-  });
-  U = next;
+// sparkline
+const sp = document.getElementById("spark"), sctx = sp.getContext("2d");
+function drawSpark() {
+  const d = Math.min(2, devicePixelRatio || 1), w = sp.clientWidth * d, h = sp.clientHeight * d;
+  if (sp.width !== w || sp.height !== h) { sp.width = w; sp.height = h; }
+  sctx.clearRect(0, 0, w, h); if (history.length < 2) return;
+  const maxF = Math.max(1, ...history.map(p => p.food));
+  const X = k => k / (history.length - 1) * w;
+  sctx.strokeStyle = "#243044"; sctx.lineWidth = d; sctx.beginPath(); sctx.moveTo(0, h / 2); sctx.lineTo(w, h / 2); sctx.stroke();
+  for (const m of marks) { const k = history.findIndex(p => p.t >= m); if (k >= 0) { sctx.strokeStyle = "#ffb84d"; sctx.beginPath(); sctx.moveTo(X(k), 0); sctx.lineTo(X(k), h); sctx.stroke(); } }
+  const line = (f, col) => { sctx.strokeStyle = col; sctx.lineWidth = 1.5 * d; sctx.beginPath(); history.forEach((p, k) => { const y = h - 3 * d - f(p) * (h - 6 * d); k ? sctx.lineTo(X(k), y) : sctx.moveTo(X(k), y); }); sctx.stroke(); };
+  line(p => p.food / maxF, "#4dff88"); line(p => (p.aim + 1) / 2, "#4dc3ff");
 }
 
-// ---------------- naturalist (Bonsai 2B via local server) + offline fallback ----------------
-async function checkModel() {
-  if (browserModel) return;
-  try {
-    const r = await fetch("api/health", { cache: "no-store" }); const j = await r.json();
-    modelOnline = !!j.model; setStatus(modelOnline ? `Bonsai 2B online · ${j.model}` : "offline naturalist (no model server)", modelOnline);
-  } catch { modelOnline = false; setStatus("offline naturalist (no model server)", false); }
-}
-let browserModel = null, NAT = null;
-async function askModel(img, A, goal) {
-  if (browserModel) {
-    try { const r = await NAT.observe(browserModel, await img, A, goal); return { ...r, source: "ai", where: "browser" }; }
-    catch (e) { console.warn("in-browser naturalist failed", e); return null; }
-  }
-  try {
-    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 240000);
-    const r = await fetch("api/naturalist", { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
-      body: JSON.stringify({ image: img, matrix: A, goal }) });
-    clearTimeout(t);
-    if (r.ok) { const j = await r.json(); if (!j.error) return { ...j, source: "ai" }; console.warn("naturalist error", j.error); }
-  } catch (e) { console.warn("naturalist failed", e); }
-  return null;
-}
-const GENUS = ["Vermis", "Cellula", "Globulus", "Serpentes", "Vortex", "Natator", "Spira", "Colonia", "Filum", "Nebula"];
-const EPI = ["fluorescens", "migrans", "rapax", "tranquilla", "pulsans", "errans", "gregaria", "vorax", "lucida", "rotans"];
-function offlineNaturalist(champ, goal) {
-  const u = U[champ.q] || U[0], m = u.samples[u.samples.length - 1] || { clustered: 0, speed: 0 };
-  const g = m.clustered > 0.6 ? (m.speed > 0.1 ? 5 : 1) : m.speed > 0.15 ? 4 : 7;
-  const name = `${GENUS[(g + gen) % GENUS.length]} ${EPI[(gen * 3 + champ.q) % EPI.length]}`;
-  const notes = `${Math.round(m.clustered * 100)}% of particles sit in tight clumps, moving at ${m.speed.toFixed(2)} on average. ` +
-    (m.clustered > 0.6 ? "Mostly organized colonies." : "Still a lot of loose drifting dust.");
-  const edits = Array.from({ length: 2 + Math.floor(R() * 3) }, () => ({ source: Math.floor(R() * K), target: Math.floor(R() * K), attraction: +(R() * 2 - 1).toFixed(2) }));
-  return { species_name: name, field_notes: notes, edits, source: "offline" };
-}
-
-// ---------------- UI ----------------
+// ======================= UI =======================
 const $ = id => document.getElementById(id);
-function setStatus(t, on) { const s = $("status"); s.textContent = t; s.className = "status " + (on ? "on" : "off"); }
-function setPhase(t) { $("phase").textContent = t; }
-function updateStats() { $("best").textContent = best.toFixed(2); $("aiwins").textContent = `${aiWins}/${aiTotal}`; }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-function logEntry(g, w, sc, origin, res) {
-  if (res.source === "pending" || res.source === "busy") {
-    res = { ...res, species_name: res.source === "pending" ? "…" : "", field_notes: res.source === "pending" ? "Bonsai is still looking at the winner. Its notes and edits will drop into slot B when they arrive." : "Bonsai is busy with the previous generation; B is a random mutation this round." };
-  }
-  const e = document.createElement("div"); e.className = "entry" + (res.source === "ai" ? " ai" : "");
-  const ed = (res.edits || []).map(x => `${CNAMES[x.source]}→${CNAMES[x.target]} ${x.attraction >= 0 ? "+" : ""}${(+x.attraction).toFixed(2)}`).join(" · ");
-  e.innerHTML = `<div class="top"><span>Gen ${g} · winner ${"ABCD"[w]} (${origin === "ai" ? "AI edits" : origin}) · alive ${sc.toFixed(3)}</span>
-    <span class="tag ${res.source === "ai" ? "ai" : "off"}">${res.source === "ai" ? "Bonsai 2B" + (res.where === "browser" ? " · WebGPU" : "") + (res.ms ? ` ${(res.ms / 1000).toFixed(1)}s` : "") + (res.late ? " · late" : "") : res.source === "offline" ? "offline" : "waiting"}</span></div>
-    ${res.species_name ? `<div class="name">${esc(res.species_name)}</div>` : ""}<div class="notes">${esc(res.field_notes || "")}</div>
-    ${ed ? `<div class="edits">${res.stale ? "edits skipped (generation moved on): " : res.late ? "now in B: " : "next B: "}${esc(ed)}</div>` : ""}`;
-  const f = $("feed"); f.prepend(e); while (f.children.length > 60) f.lastChild.remove();
+function updatePanels() {
+  const L = lineageStats(); let maxG = 0; for (let i = 0; i < n; i++) maxG = Math.max(maxG, gen[i]);
+  const last = history[history.length - 1];
+  $("sPop").textContent = n; $("sLin").textContent = L.length; $("sGen").textContent = maxG;
+  $("sFood").textContent = last ? last.food.toFixed(1) : "–"; $("sAim").textContent = last ? Math.round((last.aim + 1) * 50) + "%" : "–";
+  const sec = steps / 60; $("sTime").textContent = sec < 60 ? Math.round(sec) + " s" : Math.floor(sec / 60) + "m " + String(Math.round(sec % 60)).padStart(2, "0") + "s";
+  $("lineages").innerHTML = L.slice(0, 6).map(s => `<div class="lin"><span class="sw" style="background:${linColor(s.id)}"></span>
+    <div><div class="nm"><em>${esc(linName(s.id))}</em> · gen ${s.gen}</div><div class="bar"><div style="width:${(s.count / n * 100).toFixed(1)}%;background:${linColor(s.id)}"></div></div></div>
+    <span class="pc">${(s.count / n * 100).toFixed(0)}%</span></div>`).join("");
+  return L;
 }
-function renderHeat() {
-  const h = $("heat"); h.innerHTML = "<div></div>" + COLORS.map(c => `<div><span class="dot" style="background:${c}"></span></div>`).join("");
-  const A = U[0] ? U[0].A : champion.A;
-  for (let i = 0; i < K; i++) {
-    h.insertAdjacentHTML("beforeend", `<div><span class="dot" style="background:${COLORS[i]}"></span></div>`);
-    for (let j = 0; j < K; j++) {
-      const a = A[i * K + j], col = a >= 0 ? `rgba(77,255,136,${0.15 + 0.75 * a})` : `rgba(255,77,109,${0.15 + 0.75 * -a})`;
-      h.insertAdjacentHTML("beforeend", `<div class="cell" data-i="${i}" data-j="${j}" style="background:${col}" title="${CNAMES[i]} → ${CNAMES[j]}">${a.toFixed(1)}</div>`);
-    }
-  }
+function note({ text, title, source, extra }) {
+  const e = document.createElement("div"); e.className = "entry" + (source === "ai" ? " ai" : "");
+  const sec = Math.round(steps / 60);
+  e.innerHTML = `<div class="top"><span>${sec}s into the dish${title ? " · " + esc(title) : ""}</span><span class="tag ${source === "ai" ? "ai" : ""}">${source === "ai" ? "Bonsai 2B · WebGPU" + (extra ? " · " + extra : "") : source === "sim" ? "dish" : "offline notes"}</span></div><div>${esc(text)}</div>`;
+  const f = $("feed"); f.prepend(e); while (f.children.length > 40) f.lastChild.remove();
 }
-$("heat").addEventListener("click", ev => {
-  const c = ev.target.closest(".cell"); if (!c) return;
-  const i = +c.dataset.i, j = +c.dataset.j, d = ev.shiftKey ? -0.25 : 0.25;
-  U[0].A[i * K + j] = clamp(U[0].A[i * K + j] + d, -1, 1); U[0].origin = "elite"; renderHeat();
-});
-cv.addEventListener("click", ev => {
-  const r = cv.getBoundingClientRect(), qx = ev.clientX - r.left > r.width / 2 ? 1 : 0, qy = ev.clientY - r.top > r.height / 2 ? 1 : 0;
-  forced = qy * 2 + qx; setPhase(`${"ABCD"[forced]} will be crowned`);
-});
-document.querySelectorAll("[data-goal]").forEach(b => b.onclick = () => { $("goal").value = b.dataset.goal; });
-$("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause evolution" : "Resume evolution"; setPhase(running ? "simulating" : "paused (sim still runs)"); };
-$("step").onclick = () => { if (!waiting) genSteps = genLen; };
-$("scramble").onclick = () => { scrambleAll(); logEntry(gen, 0, 0, "random", { species_name: "Primordial soup", field_notes: "All four dishes reseeded with random chemistry.", source: "offline" }); };
-$("genlen").oninput = e => { genLen = +e.target.value * 60; $("genlenv").textContent = e.target.value + " s"; };
-function loadSaved() { try { return JSON.parse(localStorage.getItem("bonsai-life-saved") || "[]"); } catch { return []; } }
-function renderSaved() {
-  const s = $("saved"); s.innerHTML = "";
-  loadSaved().forEach((p, k) => { const b = document.createElement("button"); b.textContent = `▶ ${p.name} (alive ${(+p.score || 0).toFixed(2)})`; b.onclick = () => { freshGeneration(p.A); renderHeat(); genSteps = 0; }; s.appendChild(b); });
-}
-$("save").onclick = () => {
-  const top = $("feed").querySelector(".name"), name = top ? top.textContent : `Organism ${gen}`;
-  const p = { name, A: Array.from(U[0].A), score: champion.score || U[0].score(), gen, goal: $("goal").value, savedAt: new Date().toISOString() };
-  const all = loadSaved(); all.unshift(p); try { localStorage.setItem("bonsai-life-saved", JSON.stringify(all.slice(0, 30))); } catch {}
-  renderSaved();
-  const blob = new Blob([JSON.stringify(p, null, 1)], { type: "application/json" }), a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = name.replace(/\W+/g, "_") + ".json"; a.click();
+
+let running = true, speed = 3;
+$("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
+$("speed").oninput = e => { speed = +e.target.value; $("speedv").textContent = speed + "×"; };
+$("reset").onclick = () => newDish();
+$("scramble").onclick = () => {
+  for (let k = 0; k < n * NW; k++) W[k] = gauss() * 0.8;
+  marks.push(steps); note({ text: "Every brain was replaced with a random one. Lineages and colors stay, but everything they learned is gone. Watch food intake drop and then climb back as evolution relearns it.", source: "sim" });
 };
 
-// ---------------- main loop ----------------
-let STEPS_PER_FRAME = 2, last = performance.now(), frames = 0, fpsT = performance.now();
-function frame(now) {
-  for (let k = 0; k < STEPS_PER_FRAME; k++) U.forEach(u => u.step());
-  if (running && !waiting) {
-    genSteps++;
-    if (genSteps > genLen * 0.5 && genSteps % 10 === 0) U.forEach(u => u.measure());
-    if (genSteps === 1) U.forEach(u => (u.samples = []));
-    if (genSteps >= genLen) endGeneration();
-  }
-  draw();
-  $("prog").style.width = Math.min(100, (genSteps / genLen) * 100) + "%";
-  $("genLabel").textContent = `Gen ${gen}`;
-  frames++; if (now - fpsT > 1000) { const f = frames * 1000 / (now - fpsT); $("fps").textContent = f.toFixed(0); frames = 0; fpsT = now; }
-  requestAnimationFrame(frame);
+// ======================= narrator =======================
+let model = null, NAT = null, narrating = false, lastNarr = 0;
+function digest(L) {
+  const last = history[history.length - 1] || { food: 0, aim: 0 }, first = history[Math.max(0, history.length - 10)] || last;
+  const top = L.slice(0, 3).map(s => {
+    const idx = []; for (let i = 0; i < n && idx.length < 40; i++) if (lin[i] === s.id) idx.push(i);
+    // what do this lineage's brains do on average? probe them with a standard situation: food to the east
+    const probe = new Float32Array([1, 0, 0.6, 0, 0, 0, 0.5, 0, 0, 1]), hid = new Float32Array(NH), out = new Float32Array(NO);
+    let toward = 0; for (const i of idx) { think(i, probe, hid, out); toward += out[0]; }
+    return { name: linName(s.id), id: s.id, share: Math.round(s.count / n * 100), cells: s.count, food_per_cell: +(s.eaten / s.count).toFixed(1),
+             deepest_generation: s.gen, avg_age_s: Math.round(s.age / s.count / 60), avg_speed: +(s.speed / s.count * 1000).toFixed(2), push_toward_food_east: +(toward / idx.length).toFixed(2) };
+  });
+  return { sim_seconds: Math.round(steps / 60), cells: n, lineages_alive: L.length, food_per_cell_per_min_now: +last.food.toFixed(2), food_per_cell_per_min_earlier: +first.food.toFixed(2),
+           steers_toward_food_pct: Math.round((last.aim + 1) * 50), top_lineages: top };
 }
-window.BL = { get U() { return U; }, get gen() { return gen; }, get best() { return best; }, get modelOnline() { return modelOnline; } };
-async function wakeBonsai() {
+function offlineNote(dg) {
+  const t = dg.top_lineages[0]; if (!t) return "The dish is empty.";
+  const trend = dg.food_per_cell_per_min_now > dg.food_per_cell_per_min_earlier * 1.1 ? "Food intake is rising" : dg.food_per_cell_per_min_now < dg.food_per_cell_per_min_earlier * 0.9 ? "Food intake is falling" : "Food intake is steady";
+  return `${t.name} holds ${t.share}% of the dish after ${t.deepest_generation} generations. ${trend} (${dg.food_per_cell_per_min_now} per cell per minute), and ${dg.steers_toward_food_pct}% of food-seeing cells steer toward it.`;
+}
+async function narrate() {
+  if (narrating) return; narrating = true;
+  const L = lineageStats(), dg = digest(L);
+  try {
+    if (!model) { note({ text: offlineNote(dg), source: "offline" }); return; }
+    const prompt = `You narrate an artificial-life petri dish. Every cell runs its own tiny neural network brain (10 senses -> 6 neurons -> a push direction). Cells that eat food divide and pass on a mutated copy of their brain, so lineages evolve. Here are the current stats as JSON:
+${JSON.stringify(dg)}
+"push_toward_food_east" is how hard that lineage's brains push toward food placed to their east (1 = straight at it, 0 = ignore, negative = away).
+Reply with only a JSON object: {"names": {"<lineage id>": "<made-up two-word Latin species name>", ...for each top lineage}, "field_note": "<2-3 sentences, like a nature documentary, about who is winning and what their brains seem to have learned, using the numbers>"}`;
+    const r = await NAT.ask(model, prompt, { maxNewTokens: 220 });
+    let obj = null; const s = r.raw.indexOf("{"), e = r.raw.lastIndexOf("}");
+    if (s >= 0 && e > s) try { obj = JSON.parse(r.raw.slice(s, e + 1)); } catch {}
+    if (obj?.names) for (const [id, nm] of Object.entries(obj.names)) { const Lg = lineages.get(+id); if (Lg && typeof nm === "string" && nm.length < 40) Lg.aiName = nm; }
+    const text = (obj?.field_note || r.raw.replace(/[{}"]/g, "")).toString().slice(0, 500);
+    note({ text, source: "ai", extra: `${r.tps.toFixed(0)} tok/s` });
+  } catch (err) { console.warn(err); note({ text: offlineNote(dg), source: "offline" }); }
+  finally { narrating = false; }
+}
+async function wake() {
   const btn = $("wake"), txt = $("wakeText"), pr = $("wakeProg"), bar = $("wakeBar");
   btn.disabled = true; btn.textContent = "Waking Bonsai…"; pr.hidden = false;
   try {
     NAT = NAT || await import("./naturalist.mjs");
-    const { model, loadMs } = await NAT.loadModel({
-      onProgress: f => { if (f != null) { bar.style.width = (f * 100).toFixed(1) + "%"; txt.textContent = `Downloading Bonsai 2B weights… ${Math.round(f * NAT.TOTAL_MB)} / ${NAT.TOTAL_MB} MB`; } },
-      onStatus: m => { txt.textContent = m; },
-    });
-    browserModel = model; modelOnline = true;
-    try { localStorage.setItem("bonsai-life-autowake", "1"); } catch {}
-    setStatus("Bonsai 2B · running in this browser (WebGPU)", true);
-    txt.textContent = `Bonsai 2B is running locally on your GPU (loaded in ${(loadMs / 1000).toFixed(1)} s). Nothing leaves this tab.`;
-    btn.hidden = true; pr.hidden = true;
+    const r = await NAT.loadModel({ vision: false,
+      onProgress: f => { if (f != null) { bar.style.width = (f * 100).toFixed(1) + "%"; txt.textContent = `Downloading Bonsai 2B… ${Math.round(f * NAT.TEXT_MB)} / ${NAT.TEXT_MB} MB`; } },
+      onStatus: m => { txt.textContent = m; } });
+    model = r.model; try { localStorage.setItem("bonsai-cells-wake", "1"); } catch {}
+    $("status").textContent = "narrator: Bonsai 2B in this browser"; $("status").className = "status on";
+    txt.textContent = `Bonsai 2B is running on your GPU (loaded in ${(r.loadMs / 1000).toFixed(1)} s). It writes a field note every 20 seconds of sim time.`;
+    btn.hidden = true; pr.hidden = true; lastNarr = 0;
   } catch (e) {
     console.warn(e); btn.disabled = false; btn.textContent = "Try again"; pr.hidden = true;
-    txt.textContent = "Couldn't start Bonsai here: " + (e && e.message ? e.message : e) + " The offline naturalist keeps running.";
+    txt.textContent = "Couldn't start Bonsai here: " + (e?.message || e) + " Offline notes keep going.";
   }
 }
-$("wake").onclick = wakeBonsai;
-(async () => {
-  let auto = false; try { auto = localStorage.getItem("bonsai-life-autowake") === "1"; } catch {}
-  if (auto && navigator.gpu) wakeBonsai();
-  else if (!navigator.gpu) { $("wakeText").textContent = "This browser has no WebGPU, so Bonsai can't run here. Chrome or Edge on a laptop works. The offline naturalist writes the notes meanwhile."; $("wake").hidden = true; }
-})();
-resize(); scrambleAll(); renderSaved(); checkModel(); setInterval(checkModel, 15000);
-requestAnimationFrame(frame);
+$("wake").onclick = wake;
+if (!navigator.gpu) { $("wakeText").textContent = "This browser has no WebGPU, so Bonsai can't narrate here (Chrome or Edge on a laptop works). Offline notes keep going."; $("wake").hidden = true; }
+else { try { if (localStorage.getItem("bonsai-cells-wake") === "1") wake(); } catch {} }
+
+// ======================= loop =======================
+let fpsT = performance.now(), panelT = 0;
+function frame(now) {
+  if (running) for (let k = 0; k < speed; k++) step();
+  const sel = draw();
+  if (now - panelT > 250) { panelT = now; updatePanels(); drawSpark(); }
+  drawBrain(sel);
+  if (running && steps - lastNarr > 60 * 20) { lastNarr = steps; narrate(); }
+  requestAnimationFrame(frame);
+}
+window.BL = { get n() { return n; }, get steps() { return steps; }, get history() { return history; }, step, lineageStats };
+resize(); newDish(); requestAnimationFrame(frame);
 </script>
 </body>
 </html>

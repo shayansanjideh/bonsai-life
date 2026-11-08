@@ -13,13 +13,14 @@ export async function webgpuAvailable() {
   try { return !!(navigator.gpu && (await navigator.gpu.requestAdapter())); } catch { return false; }
 }
 
-export async function loadModel({ onProgress, onStatus, signal } = {}) {
+export async function loadModel({ onProgress, onStatus, signal, vision = true } = {}) {
   if (!(await webgpuAvailable())) throw new Error("This browser has no WebGPU. Try Chrome or Edge on a laptop, or Safari 26+.");
   const { Bonsai, CachedByteSource, UrlByteSource } = await import("./vendor/bonsai.mjs");
-  const total = WEIGHTS.reduce((a, w) => a + w.size, 0), stats = new Map(), sources = [];
+  const files = vision ? WEIGHTS : WEIGHTS.slice(0, 1);
+  const total = files.reduce((a, w) => a + w.size, 0), stats = new Map(), sources = [];
   const t0 = performance.now();
   try {
-    for (const w of WEIGHTS) {
+    for (const w of files) {
       const url = BASE + w.name;
       let src = await UrlByteSource.open(url, { knownSize: w.size, signal });
       try {
@@ -31,7 +32,7 @@ export async function loadModel({ onProgress, onStatus, signal } = {}) {
       sources.push(src);
     }
     const model = await Bonsai.load({
-      model: sources[0], mmproj: sources[1], contextLength: 4096, signal, maxImageTokens: 1024,
+      model: sources[0], ...(vision ? { mmproj: sources[1], maxImageTokens: 1024 } : {}), contextLength: 4096, signal,
       onProgress: e => onStatus?.(e.message || "Preparing WebGPU…"),
     });
     return { model, loadMs: Math.round(performance.now() - t0) };
@@ -81,3 +82,14 @@ export async function observe(model, blob, A, goal, signal) {
   }
   return { ...parseReply(raw), raw: raw.slice(0, 600), ms: Math.round(performance.now() - t0) };
 }
+
+// Text-only call (used by the living-cells narrator).
+export async function ask(model, prompt, { maxNewTokens = 300, signal } = {}) {
+  const t0 = performance.now(); let raw = "", tokens = 0;
+  for await (const ev of model.chat([{ role: "user", content: prompt }], { signal, thinking: false, maxNewTokens, sampling: { temperature: 0.7 } })) {
+    if (ev.type === "token" && ev.phase === "answer") { raw += ev.text; tokens++; }
+  }
+  const ms = Math.round(performance.now() - t0);
+  return { raw, ms, tokens, tps: tokens / Math.max(0.001, ms / 1000) };
+}
+export const TEXT_MB = Math.round(WEIGHTS[0].size / 1e6);
