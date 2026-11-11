@@ -8,14 +8,14 @@ const FP_TOP = 8;
 
 // Replay FP_TEXT under topic 0 and record the top logits at each step.
 export async function fingerprint(lm, mask) {
-  const ids = lm.encode(FP_TEXT), steps = [];
+  const text = lm.fpText ?? FP_TEXT, ids = lm.encode(text), steps = [];
   let logits = await lm.begin(lm.promptIds(S.TOPICS[0]));
   for (let i = 0; i < ids.length; i++) {
     const t = S.topN(logits, mask, FP_TOP);
     steps.push({ ids: t.ids, vals: t.vals.map(v => Math.round(v * 1e4) / 1e4) });
     if (i + 1 < ids.length) logits = await lm.step(ids[i]);
   }
-  return { text: FP_TEXT, ids, steps };
+  return { text, ids, steps };
 }
 
 // Compare two fingerprints: how far apart are the logits, and would any carrying decision flip?
