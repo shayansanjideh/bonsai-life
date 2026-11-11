@@ -93,3 +93,13 @@ export async function ask(model, prompt, { maxNewTokens = 300, signal, onToken }
   return { raw, ms, tokens, tps: tokens / Math.max(0.001, ms / 1000) };
 }
 export const TEXT_MB = Math.round(WEIGHTS[0].size / 1e6);
+
+// Multi-turn chat (system + alternating user/assistant messages): small models follow a real conversation far better than a pasted transcript.
+export async function chat(model, messages, { maxNewTokens = 120, signal, temperature = 0.8 } = {}) {
+  const t0 = performance.now(); let raw = "", tokens = 0;
+  for await (const ev of model.chat(messages, { signal, thinking: false, maxNewTokens, sampling: { temperature } })) {
+    if (ev.type === "token" && ev.phase === "answer") { raw += ev.text; tokens++; }
+  }
+  const ms = Math.round(performance.now() - t0);
+  return { raw, ms, tokens, tps: tokens / Math.max(0.001, ms / 1000) };
+}
