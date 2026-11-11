@@ -18,6 +18,18 @@ Open the hosted page and press **Wake Bonsai in this browser**. Bonsai 2B runs o
 
 Any static HTTPS host works: serve the `web/` folder.
 
+## Brain explorer (`web/brain.html`)
+
+A second page that opens up the model itself, which only works because Bonsai runs on your own GPU:
+
+- **Live odds.** Bonsai writes one token at a time and the page reads its full next-token distribution after every step, so you see its top 5 candidates and how sure it was about each pick.
+- **Fork.** Click any token to see what else it considered, then click an alternative to rewrite from that point.
+- **Brain surgery.** Switch off the token mixer (attention or linear attention) or the MLP of any layer, or a random fraction of all weights, by zeroing (or sign-flipping) the f16 scale shared by each group of 128 ternary weights. The edits are made in GPU memory and are restored bit-exactly. A reference loss (nats per token on a fixed paragraph of easy facts) tracks how much dumber it got.
+- **Lesion scan and damage sweep.** Knock out each block in turn and chart the loss increase per layer, or raise random damage step by step and watch the text fall apart.
+- **Make it say it.** Steer it to a target phrase while only choosing from its top 5 tokens.
+
+Open `brain.html?stub=1` to try the UI with a tiny fake model and no GPU. `node tests/run-tests.cjs` runs the weight-surgery checks on a software WebGPU device (bit-exact restore, only the intended scales change) plus a UI smoke test in stub mode.
+
 ## Run it locally with llama-server
 
 ```bash
