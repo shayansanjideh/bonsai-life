@@ -83,7 +83,7 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
   </div>
   <div class="pane" id="pane-story" hidden><div class="feed" id="feed"></div></div>
 </div>
-<div class="hint" id="hint">Click the island to look around · WASD to walk · Shift to run · look at a creature and press E (or click) to talk · V switches first/third person · Esc frees the mouse</div>
+<div class="hint" id="hint">WASD to walk · arrow keys (or the mouse) to turn and look · Shift to run · look at a creature and press E (or click) to talk · V switches first/third person · Esc frees the mouse</div>
 <div id="cross" style="position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid rgba(255,255,255,.85);border-radius:50%;pointer-events:none"></div>
 <div class="veil" id="veil"><h2 id="veilTitle">Waking Bonsai 2B…</h2><p id="veilText">Downloading the model into your browser (about 429 MB, once). After this it loads from cache in seconds.</p><div class="prog" id="veilProg"><div id="veilBar"></div></div></div>
 
@@ -387,7 +387,7 @@ $("play").onclick = () => { running = !running; $("play").textContent = running 
 $("speed").onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $("speed").textContent = `Speed ${speed}×`; };
 $("feast").onclick = () => { bushes.forEach(b => b.berries.forEach(m => m.visible = true)); for (let i = 0; i < 6; i++) addBush(); story("Berries burst out across the island.", "god"); };
 $("reset").onclick = () => founders();
-const keys = {}; addEventListener("keydown", e => { if (e.target.tagName !== "INPUT") keys[e.key.toLowerCase()] = true; }); addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+const keys = {}; addEventListener("keydown", e => { if (e.target.tagName !== "INPUT") { keys[e.key.toLowerCase()] = true; if (e.key.startsWith("Arrow")) e.preventDefault(); } }); addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let dragging = null;
 const cvs = renderer.domElement, locked = () => document.pointerLockElement === cvs;
 function look(dx, dy) { me.yaw -= dx * 0.0025; me.pitch = clamp(me.pitch - dy * 0.0025, -1.2, 0.9); }
@@ -459,6 +459,8 @@ function frame(t) {
   for (const e of eggs) e.mesh.rotation.z = Math.sin(t / 150) * 0.12 * (performance.now() - e.t > 0 ? 1 : 0);
   // the visitor walks on the terrain; the camera is its eyes (first person) or sits behind it (third person)
   if (document.activeElement?.tagName !== "INPUT") {
+    if (keys.arrowleft) me.yaw += 2.2 * dt; if (keys.arrowright) me.yaw -= 2.2 * dt;
+    if (keys.arrowup) me.pitch = clamp(me.pitch + 1.5 * dt, -1.2, 0.9); if (keys.arrowdown) me.pitch = clamp(me.pitch - 1.5 * dt, -1.2, 0.9);
     const run = keys.shift ? 2 : 1, f = (keys.w ? 1 : 0) - (keys.s ? 1 : 0), r = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
     if (f || r) { const sp = 9 * run * dt / Math.hypot(f, r); me.x += (-Math.sin(me.yaw) * f - Math.cos(me.yaw) * r) * sp; me.z += (-Math.cos(me.yaw) * f + Math.sin(me.yaw) * r) * sp; const rr = Math.hypot(me.x, me.z); if (rr > WORLD + 4) { me.x *= (WORLD + 4) / rr; me.z *= (WORLD + 4) / rr; } }
   }
