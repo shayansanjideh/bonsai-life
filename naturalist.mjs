@@ -84,10 +84,10 @@ export async function observe(model, blob, A, goal, signal) {
 }
 
 // Text-only call (used by the living-cells narrator).
-export async function ask(model, prompt, { maxNewTokens = 300, signal } = {}) {
+export async function ask(model, prompt, { maxNewTokens = 300, signal, onToken } = {}) {
   const t0 = performance.now(); let raw = "", tokens = 0;
   for await (const ev of model.chat([{ role: "user", content: prompt }], { signal, thinking: false, maxNewTokens, sampling: { temperature: 0.7 } })) {
-    if (ev.type === "token" && ev.phase === "answer") { raw += ev.text; tokens++; }
+    if (ev.type === "token" && ev.phase === "answer") { raw += ev.text; tokens++; onToken?.(raw); }
   }
   const ms = Math.round(performance.now() - t0);
   return { raw, ms, tokens, tps: tokens / Math.max(0.001, ms / 1000) };
