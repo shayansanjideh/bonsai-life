@@ -47,13 +47,16 @@ with sync_playwright() as pw:
               const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : {}); return {vendor: i.vendor, architecture: i.architecture, device: i.device, description: i.description, fallback: a.isFallbackAdapter}; }""")
             log("adapter:", info)
             if not info: summary[name] = {"error": "no WebGPU adapter"}; b.close(); continue
+            steps = STEPS[name]
+            if name == "swiftshader" and not any("seconds" in summary.get(n, {}) for n in ("t4_vulkan", "gpu_default")):
+                steps = ["lab-fp", "lab-rt", "lab-cap"]  # no real GPU: run everything on the CPU backend, most useful first
             t0 = time.time()
             p.click("#wake")
             p.wait_for_function("() => /ready|Couldn't/.test(document.querySelector('#loadtxt').textContent)", timeout=3600_000, polling=2000)
             log("load:", p.text_content("#loadtxt"), f"{time.time()-t0:.0f}s")
             if "Couldn't" in p.text_content("#loadtxt"): summary[name] = {"error": p.text_content("#loadtxt"), "adapter": info}; b.close(); continue
             p.click("[data-pane=lab]")
-            for step in STEPS[name]:
+            for step in steps:
                 t1 = time.time(); p.click("#" + step)
                 p.wait_for_function(f"() => /{DONE[step]}|Error/.test(document.querySelector('#labmeta').textContent)", timeout=4 * 3600_000, polling=5000)
                 log(step, p.text_content("#labmeta"), f"{time.time()-t1:.0f}s")
