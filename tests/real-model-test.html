@@ -47,7 +47,7 @@ try {
     log(`random ${p * 100}%`, `loss ${L.toFixed(4)} | ${g.text}`);
     R[`rand${p}`] = L;
   }
-  check(R.rand0_5 > R.rand0_05, "more damage, higher loss", [R.rand0_05, R.rand0_2, R.rand0_5]);
+  check(R["rand0.5"] > R["rand0.2"] && R["rand0.2"] > R["rand0.05"], "more damage, higher loss", [R["rand0.05"], R["rand0.2"], R["rand0.5"]]);
   await eng.surgeon.apply({ random: 0.2, seed: 1, mode: "flip" }); log("flip 20%", (await refLoss()).toFixed(4));
 
   await eng.surgeon.restore();
