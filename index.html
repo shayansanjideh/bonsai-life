@@ -3,32 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bonsai-Life</title>
+<title>Bonsai Village</title>
 <style>
-/* Layout: one screen. Top bar = title, controls, live stats. Left = the dish + species strip. Right = one tabbed panel. */
-:root{color-scheme:dark;--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--neg:#ff5c7a;--pos:#4dc3ff}
+/* Layout: one screen. Top bar = title, Bonsai status, controls. Left = the dish. Right = tabbed panel (Mind / Story / Cast). */
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--neg:#ff5c7a;--pos:#4dc3ff;--teal:#4dffe1}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 .app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1500px;margin:0 auto}
-.top{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap}
+.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
 .brand h1{font-size:19px;margin:0;line-height:1.2}
-.brand p{margin:0;color:var(--muted);font-size:12px}
-.controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.kpis{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
-.kpi .k{font-size:11px;color:var(--muted)}
-.kpi .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.brand p{margin:0;color:var(--muted);font-size:12px;max-width:520px}
+.controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
 .status{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .status.on{color:var(--accent);border-color:#2b6b45}
-.body{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;min-height:0}
-.dishcol{display:flex;flex-direction:column;gap:10px;min-height:0;align-items:center}
-.stage{position:relative;aspect-ratio:1;width:min(100%,calc(100vh - 190px));max-width:100%;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);flex:none}
-.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
-.strip{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:min(100%,calc(100vh - 190px))}
-.chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 6px;font-size:12px;cursor:pointer}
-.chip .sw{width:10px;height:10px;border-radius:50%}
-.chip b{font-weight:600}
-.chip span{color:var(--muted);font-variant-numeric:tabular-nums}
-.chip.dead{opacity:.4}
+.body{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;min-height:0}
+.dishcol{display:flex;flex-direction:column;gap:8px;min-height:0;align-items:center}
+.stage{position:relative;aspect-ratio:1;width:min(100%,calc(100vh - 150px));max-width:100%;background:#05080c;border-radius:12px;overflow:hidden;border:1px solid var(--line);flex:none}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.veil{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(5,8,12,.82);text-align:center;padding:24px}
+.veil[hidden]{display:none}
+.veil h2{font-size:18px;margin:0;color:var(--text);text-transform:none;letter-spacing:0}
+.veil p{margin:0;color:var(--muted);max-width:420px}
+.veil .prog{width:min(360px,80%)}
+.under{font-size:12px;color:var(--muted);width:min(100%,calc(100vh - 150px));display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .tabs{display:flex;border-bottom:1px solid var(--line)}
 .tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 6px;color:var(--muted);font-weight:600}
@@ -43,114 +40,99 @@ button:disabled{opacity:.6;cursor:default}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pos);outline-offset:2px}
 label.sl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 p.small{margin:0;font-size:12px;color:var(--muted)}
-.cellhead{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
-.cellhead b{color:var(--text);font-weight:600}
-.thought{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:14px;border-left:3px solid var(--line);min-height:44px}
-.thought.ai{border-left-color:var(--accent)}
-.thought small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
-canvas.brain{width:100%;height:210px;display:block}
-canvas.spark{width:100%;height:56px;display:block}
-.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
-.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
-.sp{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:8px;align-items:start;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
-.sp:last-child{border-bottom:0}
-.sp .sw{width:10px;height:10px;border-radius:50%;margin-top:4px}
-.sp .why{color:var(--muted)}
-.sp .facts{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
-.sp .cnt{font-variant-numeric:tabular-nums;font-weight:600}
-.sp.dead{opacity:.5}
-textarea{width:100%;min-height:60px;resize:vertical;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
-.feed{display:flex;flex-direction:column;gap:8px}
-.entry{background:var(--panel2);border-radius:8px;padding:8px 10px;border-left:3px solid var(--line);font-size:13px}
-.entry.ai{border-left-color:var(--accent)}
-.entry .top2{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}
-.tag{font-size:11px;padding:1px 6px;border-radius:99px;border:1px solid var(--line);white-space:nowrap}
-.tag.ai{color:var(--accent);border-color:#2b6b45}
+.who{display:flex;align-items:center;gap:10px}
+.who .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.who .nm{font-size:17px;font-weight:700}
+.who .ps{color:var(--muted);font-size:13px}
+.bar{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.bar>div{height:100%}
+.card{background:var(--panel2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.card .k{font-size:11px;color:var(--muted)}
+.card.ai{border-left:3px solid var(--accent)}
+ul.mem{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.feel{display:flex;flex-wrap:wrap;gap:6px}
+.feel span{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--panel)}
+textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:52px;resize:vertical}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.feed{display:flex;flex-direction:column;gap:6px}
+.ev{font-size:13px;padding:6px 10px;border-radius:8px;background:var(--panel2);border-left:3px solid var(--line)}
+.ev .t{color:var(--muted);font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+.ev.attack{border-left-color:var(--neg)} .ev.share{border-left-color:var(--teal)} .ev.say{border-left-color:var(--pos)} .ev.death{border-left-color:#6b7280} .ev.god{border-left-color:var(--warn)}
+.cast{display:flex;flex-direction:column;gap:6px}
+.cm{display:grid;grid-template-columns:12px minmax(0,1fr) 54px;gap:8px;align-items:center;font-size:13px;padding:6px 8px;border-radius:8px;background:var(--panel2);cursor:pointer}
+.cm .dot{width:12px;height:12px;border-radius:50%}
+.cm .act{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cm.dead{opacity:.45}
 .prog{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
-.prog>div{height:100%;width:0;background:var(--accent)}
-.pills{display:flex;gap:6px;flex-wrap:wrap}
-.pill{border-radius:999px;font-size:12px;padding:3px 10px}
-.box{background:var(--panel2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.prog>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.tag{font-size:11px;padding:1px 6px;border-radius:99px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+.tag.ai{color:var(--accent);border-color:#2b6b45}
 @media (max-width:1000px){
-  html,body{height:auto}
-  .app{height:auto}
+  html,body{height:auto} .app{height:auto}
   .body{grid-template-columns:1fr}
-  .stage,.strip{width:100%}
-  .kpis{margin-left:0}
+  .stage,.under{width:100%}
+  .controls{margin-left:0}
 }
 </style>
 </head>
 <body>
 <div class="app">
   <div class="top">
-    <div class="brand"><h1>Bonsai-Life</h1><p>Every cell runs its own tiny neural network. Bonsai 2B, running in your browser, invents species and voices their thoughts.</p></div>
+    <div class="brand"><h1>Bonsai Village</h1><p>Every creature is played by Bonsai 2B, a 0.4 GB AI model running on your GPU inside this tab. Each move and line of speech is its decision.</p></div>
+    <span id="status" class="status">Bonsai: loading…</span>
     <div class="controls">
       <button id="play" class="primary">Pause</button>
-      <label class="sl">Speed <input id="speed" type="range" min="0" max="6" value="1" aria-label="Simulation speed"> <span id="speedv">1×</span></label>
-      <button id="scramble" title="Replace every brain with a random one. Species stay; what they learned is gone.">Scramble brains</button>
-      <button id="reset">New dish</button>
+      <label class="sl">Speed <input id="speed" type="range" min="0" max="3" value="1" aria-label="Movement speed"> <span id="speedv">1×</span></label>
+      <button id="feast" title="Scatter a lot of food">Feast</button>
+      <button id="famine" title="Remove all food for 20 seconds">Famine</button>
+      <button id="reset">New village</button>
     </div>
-    <div class="kpis">
-      <div class="kpi"><div class="k">Cells</div><div class="v" id="sPop">–</div></div>
-      <div class="kpi"><div class="k">Species alive</div><div class="v" id="sLin">–</div></div>
-      <div class="kpi"><div class="k">Steers to food</div><div class="v" id="sAim">–</div></div>
-      <div class="kpi"><div class="k">Generation</div><div class="v" id="sGen">–</div></div>
-      <div class="kpi"><div class="k">Time</div><div class="v" id="sTime">–</div></div>
-    </div>
-    <span id="status" class="status">Bonsai: asleep</span>
   </div>
 
   <div class="body">
     <div class="dishcol">
-      <div class="stage"><canvas id="cv"></canvas><canvas id="ov" style="pointer-events:none"></canvas></div>
-      <div class="strip" id="strip"></div>
+      <div class="stage">
+        <canvas id="cv"></canvas>
+        <div class="veil" id="veil">
+          <h2 id="veilTitle">Waking Bonsai 2B…</h2>
+          <p id="veilText">Downloading the model into your browser (about 429 MB, once). After this it loads from cache in seconds.</p>
+          <div class="prog"><div id="veilBar"></div></div>
+        </div>
+      </div>
+      <div class="under"><span>Click empty space to drop food. Click a creature to read its mind. Earlier experiments: <a href="cells.html" style="color:var(--muted)">neural cells</a>, <a href="breeder.html" style="color:var(--muted)">matrix breeder</a></span><span id="perf">–</span></div>
     </div>
 
     <div class="panel">
       <div class="tabs" role="tablist">
-        <button role="tab" id="tab-cell" aria-selected="true">Cell</button>
-        <button role="tab" id="tab-species" aria-selected="false">Species</button>
-        <button role="tab" id="tab-bonsai" aria-selected="false">Bonsai</button>
+        <button role="tab" id="tab-mind" aria-selected="true">Mind</button>
+        <button role="tab" id="tab-story" aria-selected="false">Story</button>
+        <button role="tab" id="tab-cast" aria-selected="false">Cast</button>
       </div>
 
-      <div class="pane" id="pane-cell">
-        <div class="cellhead" id="cellinfo">Following a cell. Click any cell in the dish to switch.</div>
-        <div class="thought" id="thought">…</div>
-        <h2>Its brain, live</h2>
-        <canvas class="brain" id="brain"></canvas>
-        <p class="small">Left: what it senses. Middle: 6 neurons. Right: which way it pushes. Blue excites, red inhibits; brightness shows how hard each connection is firing now.</p>
+      <div class="pane" id="pane-mind">
+        <div class="who"><span class="dot" id="mDot"></span><div><div class="nm" id="mName">–</div><div class="ps" id="mPers"></div></div></div>
+        <div><div class="row" style="justify-content:space-between"><span class="small" style="font-size:12px;color:var(--muted)">Energy</span><span class="small" id="mEnergy" style="font-size:12px;color:var(--muted)"></span></div><div class="bar"><div id="mBar"></div></div></div>
+        <div class="card" id="mDecision"><div class="k">Latest decision</div><div id="mAction">–</div><div id="mThought" style="color:var(--muted)"></div></div>
+        <div><h2>Memory</h2><ul class="mem" id="mMem"></ul></div>
+        <div><h2>Feelings</h2><div class="feel" id="mFeel"></div></div>
+        <div class="card">
+          <div class="k">Whisper to <span id="wName">them</span> as a voice from the sky</div>
+          <textarea id="whisper" aria-label="Whisper">Watch out. Someone here wants to hurt you.</textarea>
+          <div class="row"><button id="whisperBtn" class="primary">Whisper</button><span class="small" id="whisperOut"></span></div>
+        </div>
       </div>
 
-      <div class="pane" id="pane-species" hidden>
-        <div>
-          <h2>Learning</h2>
-          <canvas class="spark" id="spark"></canvas>
-          <div class="legend"><span><i style="background:var(--pos)"></i>steers toward food</span><span><i style="background:var(--accent)"></i>food per cell</span><span><i style="background:var(--warn)"></i>brains scrambled</span></div>
-        </div>
-        <div id="species"></div>
-        <p class="small">Lines in the dish: <span style="color:#ff4d6d">red</span> = a bite, <span style="color:#4dffe1">teal</span> = sharing food with a relative, <span style="color:#c08bff">purple</span> = scavenging the dead. Extinct species return as 4 migrants every 30 s, carrying the leading species' brain, so only their personality differs.</p>
+      <div class="pane" id="pane-story" hidden>
+        <div class="feed" id="feed"></div>
       </div>
 
-      <div class="pane" id="pane-bonsai" hidden>
-        <div class="box" id="wakeBox">
-          <p class="small" id="wakeText">Wake Bonsai 2B to run it on your GPU, inside this tab. The first time downloads about 429 MB from Hugging Face; after that it loads from cache. Until then, simple built-in fallbacks stand in.</p>
-          <div><button id="wake" class="primary">Wake Bonsai</button></div>
-          <div class="prog" id="wakeProg" hidden><div id="wakeBar"></div></div>
-        </div>
-        <div class="box">
-          <h2>Invent a species</h2>
-          <textarea id="invent" aria-label="Describe a personality">A coward that runs from hunters but steals food from crowds</textarea>
-          <div class="pills">
-            <button class="pill" data-idea="A gentle giant that is slow, lives long and feeds its family">Gentle giant</button>
-            <button class="pill" data-idea="A vampire that bites everyone and never stops moving">Vampire</button>
-            <button class="pill" data-idea="A hermit that hates company and eats the dead">Hermit</button>
-          </div>
-          <div><button id="inventBtn" class="primary">Hatch it</button></div>
-          <p class="small" id="inventOut"></p>
-        </div>
-        <div>
-          <h2>Field notes</h2>
-          <div class="feed" id="feed"></div>
+      <div class="pane" id="pane-cast" hidden>
+        <div class="cast" id="cast"></div>
+        <div class="card">
+          <div class="k">Add a creature. Describe it and Bonsai writes it into the village.</div>
+          <textarea id="newDesc" aria-label="Describe a new creature">a sneaky thief who pretends to be everyone's friend</textarea>
+          <div class="row"><button id="addBtn" class="primary">Add to village</button><span class="small" id="addOut"></span></div>
         </div>
       </div>
     </div>
@@ -159,518 +141,342 @@ textarea{width:100%;min-height:60px;resize:vertical;background:var(--panel2);bor
 
 <script>
 "use strict";
-// ======================= world =======================
-const MAXC = 280, MAXF = 220, START = 64;
-const NI = 10, NH = 6, NO = 2, NW = NI * NH + NH * NO + NO;      // 74 numbers per brain
-const SENSE = 0.12, CROWD = 0.05, EAT = 0.016, GRID = 8, TOUCH = 0.016, WALL = 0.012;
-const IN_LABELS = ["food →", "food ↓", "food near", "crowd →", "crowd ↓", "kin nearby", "energy", "wall →", "wall ↓", "bias"];
-const OUT_LABELS = ["push →", "push ↓"];
-const ACC = 0.00014, DAMP = 0.86, MAXV = 0.0018;
-
-let rnd = mulberry(Date.now() & 0xffffffff);
-function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function gauss() { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
-
-// Personalities: body traits per species. Brains still evolve inside each species.
-// Knobs: base (metabolism ×), speed (×), move (movement cost ×), eat (reach ×), divide (energy to split), life (lifespan ×),
-// and behaviors: bite, share, scav, herd, loner, flee (bolts from biters).
-const BASE_P = [
-  { key: "Hunter",    hue: 0,   blurb: "bites other species to steal energy; burns energy faster", base: 1.5, bite: true },
-  { key: "Sprinter",  hue: 30,  blurb: "1.6× faster, but moving costs twice as much", speed: 1.6, move: 2 },
-  { key: "Herder",    hue: 55,  blurb: "thrives near its own kind, struggles alone", herd: true },
-  { key: "Loner",     hue: 120, blurb: "cheap to run alone, stressed by any neighbor", loner: true },
-  { key: "Sharer",    hue: 175, blurb: "feeds hungry relatives when it has energy to spare", share: true },
-  { key: "Grazer",    hue: 210, blurb: "eats from a wider reach but moves slowly", eat: 1.7, speed: 0.7 },
-  { key: "Scavenger", hue: 270, blurb: "feeds on cells that die nearby", base: 0.9, scav: true },
-  { key: "Breeder",   hue: 315, blurb: "divides early and often, but dies young", divide: 1.0, life: 0.6 },
+// ===================== world =====================
+const WALL = 0.03, R_EAT = 0.03, R_TOUCH = 0.045, SEE = 0.38, FOOD_MAX = 45;
+const CAST = [
+  ["Mo", "a bully who takes what it wants from the weak"],
+  ["Pip", "a nervous little thing who avoids trouble"],
+  ["Kai", "a generous soul who looks after anyone hungry"],
+  ["Vex", "a schemer who befriends others, then betrays them"],
+  ["Lu", "a lazy grazer who mostly eats and naps"],
+  ["Rook", "a loyal guard who protects friends from bullies"],
+  ["Juno", "a curious explorer who loves meeting everyone"],
+  ["Sable", "a lone wolf who hates company"],
+  ["Tiko", "a joker who teases everyone"],
+  ["Wren", "a peacemaker who tries to stop fights"],
 ];
-let P = BASE_P.map(p => ({ ...p }));
-const pers = l => P[l - 1];
-let SPS = [];
-const newStats = () => ({ births: 0, starved: 0, eaten: 0, old: 0, lifeSum: 0, deaths: 0, bites: 0, shares: 0, scav: 0, extinctAt: 0 });
-
-const cx = new Float32Array(MAXC), cy = new Float32Array(MAXC), cvx = new Float32Array(MAXC), cvy = new Float32Array(MAXC);
-const energy = new Float32Array(MAXC), age = new Uint32Array(MAXC), gen = new Uint32Array(MAXC), lin = new Uint32Array(MAXC);
-const eaten = new Uint32Array(MAXC), kids = new Uint32Array(MAXC), uid = new Uint32Array(MAXC), lastBit = new Uint32Array(MAXC), lastBite = new Uint32Array(MAXC);
-const W = new Float32Array(MAXC * NW);
-let n = 0, nextUid = 1, steps = 0;
-const fx = new Float32Array(MAXF), fy = new Float32Array(MAXF); let nf = 0;
-const blooms = [0, 1, 2].map(() => ({ x: .2 + rnd() * .6, y: .2 + rnd() * .6, vx: (rnd() - .5) * 2e-4, vy: (rnd() - .5) * 2e-4 }));
-const names = new Map();
-let foodEvents = 0, aimSum = 0, aimN = 0; const history = [], marks = [], flashes = [];
-let selectedUid = 0, followLin = 0, followNote = false;
-
+const HUES = [0, 45, 175, 285, 95, 215, 30, 255, 320, 140];
+const ACTIONS = ["eat", "rest", "wander", "follow", "flee", "attack", "share"];
+const NEEDS_TARGET = new Set(["follow", "flee", "attack", "share"]);
+let C = [], food = [], t0 = performance.now(), simT = 0, famineUntil = 0, selected = null, nextHue = 0;
+const rnd = Math.random;
 const clampIn = v => Math.min(1 - WALL, Math.max(WALL, v));
-function addCell(x, y, e, l, g, parent) {
-  if (n >= MAXC) return -1;
-  const i = n++; cx[i] = clampIn(x); cy[i] = clampIn(y); cvx[i] = 0; cvy[i] = 0; energy[i] = e; age[i] = 0; gen[i] = g; lin[i] = l;
-  eaten[i] = 0; kids[i] = 0; uid[i] = nextUid++; lastBit[i] = 0; lastBite[i] = 0;
-  const o = i * NW;
-  if (parent >= 0) { const p = parent * NW; for (let k = 0; k < NW; k++) W[o + k] = W[p + k] + (rnd() < 0.25 ? gauss() * 0.25 : 0); }
-  else for (let k = 0; k < NW; k++) W[o + k] = gauss() * 0.8;
-  return i;
+const now = () => simT;
+const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function makeCreature(name, personality, hue) {
+  return { name, personality, hue, x: clampIn(rnd()), y: clampIn(rnd()), vx: 0, vy: 0, energy: 0.6 + rnd() * 0.3, alive: true,
+           action: { type: "wander", target: null }, say: null, thought: "", memory: [], feelings: {}, lastTurn: -1e9,
+           urgent: true, whisper: null, heading: rnd() * 6.283, touched: 0, decisions: 0, ai: false, born: simT };
 }
-function removeCell(i) {
-  const j = --n; if (i === j) return;
-  cx[i] = cx[j]; cy[i] = cy[j]; cvx[i] = cvx[j]; cvy[i] = cvy[j]; energy[i] = energy[j]; age[i] = age[j]; gen[i] = gen[j];
-  lin[i] = lin[j]; eaten[i] = eaten[j]; kids[i] = kids[j]; uid[i] = uid[j]; lastBit[i] = lastBit[j]; lastBite[i] = lastBite[j];
-  W.copyWithin(i * NW, j * NW, j * NW + NW);
+function newVillage() {
+  C = CAST.map(([n, p], k) => makeCreature(n, p, HUES[k])); nextHue = 0; food = [];
+  for (let i = 0; i < 14; i++) food.push({ x: clampIn(rnd()), y: clampIn(rnd()) });
+  selected = C[1]; simT = 0; famineUntil = 0; $("feed").innerHTML = "";
+  story("A new village wakes up: " + C.map(c => c.name).join(", ") + ".", "god");
 }
-function addFood(x, y) { if (nf >= MAXF) return; fx[nf] = clampIn(x); fy[nf] = clampIn(y); nf++; }
-function removeFood(k) { nf--; fx[k] = fx[nf]; fy[k] = fy[nf]; }
+const byName = n => C.find(c => c.alive && c.name.toLowerCase() === String(n || "").trim().toLowerCase());
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function remember(c, text) { c.memory.unshift({ t: simT, text }); if (c.memory.length > 6) c.memory.pop(); }
+function feel(c, other, d) { c.feelings[other] = Math.max(-5, Math.min(5, (c.feelings[other] || 0) + d)); }
+const feelWord = v => v <= -3 ? "hates" : v <= -1 ? "distrusts" : v >= 3 ? "trusts" : v >= 1 ? "likes" : "neutral about";
+const feelYou = v => v <= -3 ? "you hate" : v <= -1 ? "you distrust" : v >= 3 ? "you trust" : v >= 1 ? "you like" : "you feel neutral about";
 
-function newDish() {
-  n = 0; nf = 0; steps = 0; history.length = 0; marks.length = 0; flashes.length = 0; selectedUid = 0; names.clear();
-  P = BASE_P.map(p => ({ ...p })); SPS = P.map(newStats);
-  for (let s = 1; s <= P.length; s++) {
-    const f = addCell(rnd(), rnd(), 1.0, s, 0, -1);
-    for (let i = 1; i < START / P.length; i++) addCell(rnd(), rnd(), 0.9 + rnd() * 0.2, s, 0, f);
+// ===================== physics: carry out each creature's chosen action =====================
+function steerTo(c, tx, ty, sp) { const dx = tx - c.x, dy = ty - c.y, m = Math.hypot(dx, dy) + 1e-9; c.vx += (dx / m) * sp * 0.15; c.vy += (dy / m) * sp * 0.15; }
+function tick(dt) {
+  simT += dt;
+  if (simT > famineUntil && food.length < FOOD_MAX && rnd() < dt * 0.55) food.push({ x: clampIn(0.1 + rnd() * 0.8), y: clampIn(0.1 + rnd() * 0.8) });
+  const SP = 0.0022;
+  for (const c of C) {
+    if (!c.alive) continue;
+    const a = c.action, T = a.target ? byName(a.target) : null;
+    if (NEEDS_TARGET.has(a.type) && !T) { a.type = "eat"; a.target = null; c.urgent = true; }
+    let moving = true;
+    if (a.type === "eat") { let best = null, bd = 9; for (const f of food) { const d = Math.hypot(f.x - c.x, f.y - c.y); if (d < bd) { bd = d; best = f; } } if (best) steerTo(c, best.x, best.y, SP); else moving = false; }
+    else if (a.type === "rest") moving = false;
+    else if (a.type === "wander") { c.heading += (rnd() - 0.5) * 0.3; c.vx += Math.cos(c.heading) * SP * 0.1; c.vy += Math.sin(c.heading) * SP * 0.1; }
+    else if (a.type === "follow") { if (dist(c, T) > 0.07) steerTo(c, T.x, T.y, SP); else moving = false; }
+    else if (a.type === "flee") steerTo(c, 2 * c.x - T.x, 2 * c.y - T.y, SP * 1.15);
+    else if (a.type === "attack" || a.type === "share") {
+      steerTo(c, T.x, T.y, SP * (a.type === "attack" ? 1.1 : 1));
+      if (dist(c, T) < R_TOUCH && simT - c.touched > 1.5) {
+        c.touched = simT;
+        if (a.type === "attack") {
+          const take = Math.min(0.2, T.energy); T.energy -= take; c.energy = Math.min(1, c.energy + take * 0.8);
+          remember(T, `${c.name} attacked me`); feel(T, c.name, -2); remember(c, `I attacked ${T.name}`); T.urgent = true;
+          for (const o of C) if (o.alive && o !== c && o !== T && dist(o, c) < SEE) { remember(o, `I saw ${c.name} attack ${T.name}`); feel(o, c.name, -1); }
+          story(`${c.name} attacked ${T.name} and stole energy.`, "attack"); fx.push({ a: c, b: T, type: "attack", t: simT });
+        } else {
+          const give = Math.min(0.15, Math.max(0, c.energy - 0.2)); if (give > 0) {
+            c.energy -= give; T.energy = Math.min(1, T.energy + give);
+            remember(T, `${c.name} shared food with me`); feel(T, c.name, 2); remember(c, `I shared with ${T.name}`); feel(c, T.name, 1);
+            story(`${c.name} shared food with ${T.name}.`, "share"); fx.push({ a: c, b: T, type: "share", t: simT });
+          }
+          a.type = "wander"; a.target = null; c.urgent = true;
+        }
+      }
+    }
+    const vmax = SP * (a.type === "flee" ? 1.15 : 1);
+    c.vx *= 0.88; c.vy *= 0.88; const v = Math.hypot(c.vx, c.vy); if (v > vmax) { c.vx *= vmax / v; c.vy *= vmax / v; }
+    c.x += c.vx; c.y += c.vy;
+    if (c.x < WALL || c.x > 1 - WALL) { c.vx = -c.vx; c.heading = Math.PI - c.heading; c.x = clampIn(c.x); }
+    if (c.y < WALL || c.y > 1 - WALL) { c.vy = -c.vy; c.heading = -c.heading; c.y = clampIn(c.y); }
+    // eating happens whenever a creature passes over food
+    for (let k = food.length - 1; k >= 0; k--) if (Math.hypot(food[k].x - c.x, food[k].y - c.y) < R_EAT) { food.splice(k, 1); c.energy = Math.min(1, c.energy + 0.2); if (a.type === "eat" && c.energy > 0.9) c.urgent = true; }
+    c.energy -= dt * (moving ? 0.02 : 0.007);
+    if (c.energy <= 0) {
+      c.alive = false; c.energy = 0; c.diedAt = simT; story(`${c.name} died.`, "death");
+      for (const o of C) if (o.alive && dist(o, c) < SEE) { remember(o, `${c.name} died near me`); o.urgent = true; }
+      for (let k = 0; k < 3; k++) food.push({ x: clampIn(c.x + (rnd() - .5) * .05), y: clampIn(c.y + (rnd() - .5) * .05) });
+    }
   }
-  for (let i = 0; i < 120; i++) addFood(rnd(), rnd());
-  document.getElementById("feed").innerHTML = "";
-  note({ text: `New dish: ${P.length} species with different personalities, ${START} cells. Every cell has its own ${NW}-number brain; each species starts from one random brain, so none of them know how to find food yet.`, source: "sim" });
+  // bodies don't overlap
+  const live = C.filter(c => c.alive);
+  for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+    const a = live[i], b = live[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) + 1e-9, m = 0.05;
+    if (d < m) { const push = (m - d) / 2, ux = dx / d, uy = dy / d; a.x = clampIn(a.x - ux * push); a.y = clampIn(a.y - uy * push); b.x = clampIn(b.x + ux * push); b.y = clampIn(b.y + uy * push); }
+  }
+  // newcomers keep the village going
+  if (C.filter(c => c.alive).length < 5 && rnd() < dt * 0.05) {
+    const [n, p] = CAST[(rnd() * CAST.length) | 0], name = uniqueName(n); const c = makeCreature(name, p, (HUES[(nextHue++) % HUES.length] + 17) % 360); C.push(c);
+    story(`${name} wandered into the village (${p}).`, "god");
+  }
 }
+function uniqueName(n) { let k = 2, s = n; while (C.some(c => c.name === s)) s = n + " " + ["II", "III", "IV", "V", "VI"][Math.min(4, (k++) - 2)]; return s; }
 
-// ======================= brains =======================
-const inBuf = new Float32Array(NI), hidBuf = new Float32Array(NH), outBuf = new Float32Array(NO);
-function think(i, inp, hid, out) {
-  const o = i * NW;
-  for (let h = 0; h < NH; h++) { let s = 0; for (let k = 0; k < NI; k++) s += W[o + h * NI + k] * inp[k]; hid[h] = Math.tanh(s); }
-  const ob = o + NI * NH;
-  for (let q = 0; q < NO; q++) { let s = W[ob + NH * NO + q]; for (let h = 0; h < NH; h++) s += W[ob + q * NH + h] * hid[h]; out[q] = Math.tanh(s); }
+// ===================== Bonsai turn loop =====================
+function perceive(c) {
+  const others = C.filter(o => o.alive && o !== c).map(o => ({ o, d: dist(o, c) })).filter(e => e.d < SEE).sort((a, b) => a.d - b.d).slice(0, 4);
+  let nf = 0, fd = 9, fdir = ""; for (const f of food) { const d = Math.hypot(f.x - c.x, f.y - c.y); if (d < SEE) nf++; if (d < fd) { fd = d; fdir = dirWord(f.x - c.x, f.y - c.y); } }
+  return { others, nf, fd, fdir };
 }
-const cHead = new Int32Array(GRID * GRID), cNext = new Int32Array(MAXC), fHead = new Int32Array(GRID * GRID), fNext = new Int32Array(MAXF);
-const gIdx = v => Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
-const cellOf = (x, y) => gIdx(x) * GRID + gIdx(y);
-function rebin() {
-  cHead.fill(-1); fHead.fill(-1);
-  for (let i = 0; i < n; i++) { const c = cellOf(cx[i], cy[i]); cNext[i] = cHead[c]; cHead[c] = i; }
-  for (let k = 0; k < nf; k++) { const c = cellOf(fx[k], fy[k]); fNext[k] = fHead[c]; fHead[c] = k; }
-}
-const senseInfo = { cn: 0, kin: 0, biter: -1 };
-function sense(i, inp) {
-  const gx = gIdx(cx[i]), gy = gIdx(cy[i]);
-  let best = 1e9, bdx = 0, bdy = 0, crx = 0, cry = 0, cn = 0, kin = 0, biter = -1, bd2 = 1e9;
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-    const ax = gx + dx, ay = gy + dy; if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) continue;
-    const c = ax * GRID + ay;
-    for (let k = fHead[c]; k !== -1; k = fNext[k]) {
-      const ddx = fx[k] - cx[i], ddy = fy[k] - cy[i], d2 = ddx * ddx + ddy * ddy;
-      if (d2 < best) { best = d2; bdx = ddx; bdy = ddy; }
-    }
-    for (let j = cHead[c]; j !== -1; j = cNext[j]) {
-      if (j === i || j >= n) continue;
-      const ddx = cx[j] - cx[i], ddy = cy[j] - cy[i], d2 = ddx * ddx + ddy * ddy;
-      if (d2 < CROWD * CROWD) { cn++; crx += ddx; cry += ddy; if (lin[j] === lin[i]) kin++; }
-      if (d2 < SENSE * SENSE && lin[j] !== lin[i] && pers(lin[j]).bite && d2 < bd2) { bd2 = d2; biter = j; }
-    }
-  }
-  const d = Math.sqrt(best);
-  if (d < SENSE) { inp[0] = bdx / (d + 1e-6); inp[1] = bdy / (d + 1e-6); inp[2] = 1 - d / SENSE; } else { inp[0] = 0; inp[1] = 0; inp[2] = 0; }
-  if (cn) { const m = Math.hypot(crx, cry) + 1e-6; inp[3] = crx / m; inp[4] = cry / m; inp[5] = kin / cn; } else { inp[3] = 0; inp[4] = 0; inp[5] = 0; }
-  const wf = v => Math.max(0, 1 - v / SENSE);
-  inp[6] = Math.min(1.5, energy[i]) / 1.5; inp[7] = wf(1 - cx[i]) - wf(cx[i]); inp[8] = wf(1 - cy[i]) - wf(cy[i]); inp[9] = 1;
-  senseInfo.cn = cn; senseInfo.kin = kin; senseInfo.biter = biter;
-  return d < SENSE;
-}
+function dirWord(dx, dy) { const a = Math.atan2(dy, dx) * 180 / Math.PI; return ["to your right", "below you", "to your left", "above you"][Math.round(((a + 360) % 360) / 90) % 4]; }
+const near = d => d < 0.08 ? "right next to you" : d < 0.2 ? "close" : "a bit away";
+function buildPrompt(c) {
+  const p = perceive(c);
+  const seen = p.others.length ? p.others.map(e => `- ${e.o.name}: ${near(e.d)}, energy ${Math.round(e.o.energy * 100)}%, currently ${e.o.action.type}${e.o.action.target ? " " + e.o.action.target : ""}; ${feelYou(c.feelings[e.o.name] || 0)} ${e.o.name}`).join("\n") : "- nobody nearby";
+  const mem = c.memory.length ? c.memory.slice(0, 5).map(m => `- ${m.text} (${Math.round(simT - m.t)} s ago)`).join("\n") : "- nothing yet";
+  return `You are ${c.name}, a small creature living in a petri dish with others. Your personality: ${c.personality}.
+Your energy: ${Math.round(c.energy * 100)}% (at 0% you die; food restores it; moving costs energy, resting costs less).
+Food: ${p.nf ? `${p.nf} pieces nearby, the closest is ${near(p.fd)} ${p.fdir}` : "none nearby"}.
+Who you can see:
+${seen}
+Your recent memories:
+${mem}${c.whisper ? `\nA mysterious voice from the sky just whispered to you: "${c.whisper}"` : ""}
 
-// ======================= step =======================
-function step() {
-  steps++;
-  for (const b of blooms) { b.x += b.vx; b.y += b.vy; if (b.x < .15 || b.x > .85) b.vx = -b.vx; if (b.y < .15 || b.y > .85) b.vy = -b.vy; if (rnd() < 0.002) { b.vx = (rnd() - .5) * 2e-4; b.vy = (rnd() - .5) * 2e-4; } }
-  if (rnd() < 0.8) { if (rnd() < 0.8) { const b = blooms[(rnd() * 3) | 0]; addFood(b.x + gauss() * 0.06, b.y + gauss() * 0.06); } else addFood(rnd(), rnd()); }
-  rebin();
-  for (let i = 0; i < n; i++) {
-    const sees = sense(i, inBuf); think(i, inBuf, hidBuf, outBuf);
-    let tx = outBuf[0], ty = outBuf[1];
-    if (sees) { const m = Math.hypot(tx, ty); if (m > 0.05) { aimSum += (tx * inBuf[0] + ty * inBuf[1]) / m; aimN++; } }
-    const pp = pers(lin[i]);
-    let spd = pp.speed || 1;
-    if (pp.flee && senseInfo.biter >= 0) {
-      const j = senseInfo.biter, ddx = cx[i] - cx[j], ddy = cy[i] - cy[j], m = Math.hypot(ddx, ddy) + 1e-6;
-      tx = 0.4 * tx + ddx / m; ty = 0.4 * ty + ddy / m; spd *= 1.5;
-    }
-    const vmax = MAXV * spd;
-    cvx[i] = cvx[i] * DAMP + tx * ACC * spd; cvy[i] = cvy[i] * DAMP + ty * ACC * spd;
-    const sp = Math.hypot(cvx[i], cvy[i]); if (sp > vmax) { cvx[i] *= vmax / sp; cvy[i] *= vmax / sp; }
-    cx[i] += cvx[i]; cy[i] += cvy[i];
-    if (cx[i] < WALL) { cx[i] = WALL; cvx[i] = Math.abs(cvx[i]) * 0.5; } else if (cx[i] > 1 - WALL) { cx[i] = 1 - WALL; cvx[i] = -Math.abs(cvx[i]) * 0.5; }
-    if (cy[i] < WALL) { cy[i] = WALL; cvy[i] = Math.abs(cvy[i]) * 0.5; } else if (cy[i] > 1 - WALL) { cy[i] = 1 - WALL; cvy[i] = -Math.abs(cvy[i]) * 0.5; }
-    let base = 0.001 * (pp.base || 1);
-    if (pp.herd) base *= senseInfo.kin >= 2 ? 0.55 : 1.25;
-    if (pp.loner) base *= senseInfo.cn === 0 ? 0.7 : 1.6;
-    energy[i] -= base + 0.0012 * (pp.move || 1) * (tx * tx + ty * ty);
-    age[i]++;
-  }
-  for (let i = 0; i < n; i++) {
-    const c = cellOf(cx[i], cy[i]), er = EAT * (pers(lin[i]).eat || 1);
-    for (let k = fHead[c]; k !== -1; k = fNext[k]) {
-      if (fx[k] < 0) continue;
-      const ddx = fx[k] - cx[i], ddy = fy[k] - cy[i];
-      if (ddx * ddx + ddy * ddy < er * er) { fx[k] = -1; energy[i] = Math.min(1.6, energy[i] + 0.3); eaten[i]++; foodEvents++; }
-    }
-  }
-  for (let k = nf - 1; k >= 0; k--) if (fx[k] < 0) removeFood(k);
-  interact();
-  for (let i = n - 1; i >= 0; i--) {
-    const pp = pers(lin[i]), st = SPS[lin[i] - 1];
-    if (energy[i] <= 0 || age[i] > 9000 * (pp.life || 1)) {
-      st.deaths++; st.lifeSum += age[i];
-      if (energy[i] > 0) st.old++; else if (lastBit[i] && steps - lastBit[i] < 90) st.eaten++; else st.starved++;
-      scavenge(i); removeCell(i); continue;
-    }
-    if (energy[i] > (pp.divide || 1.2) && n < MAXC) {
-      energy[i] = (energy[i] - 0.05) * 0.5; kids[i]++; st.births++;
-      addCell(cx[i] + (rnd() - .5) * 0.01, cy[i] + (rnd() - .5) * 0.01, energy[i], lin[i], gen[i] + 1, i);
-    }
-  }
-  if (steps % 30 === 0) {
-    const alive = new Set(); for (let i = 0; i < n; i++) alive.add(lin[i]);
-    P.forEach((pp, k) => { if (!SPS[k].extinctAt && !alive.has(k + 1) && steps > 60) { SPS[k].extinctAt = steps; note({ text: `The ${pp.key}s (${spName(k + 1)}) went extinct.`, source: "sim" }); } });
-  }
-  if (steps % 1800 === 0 && n) {
-    const leader = leaderId(), donors = []; for (let i = 0; i < n; i++) if (lin[i] === leader) donors.push(i);
-    P.forEach((pp, k) => { if (SPS[k].extinctAt && donors.length) {
-      for (let m = 0; m < 4 && n < MAXC; m++) addCell(rnd(), rnd(), 1.0, k + 1, 0, donors[(rnd() * donors.length) | 0]);
-      SPS[k].extinctAt = 0; note({ text: `4 ${pp.key}s migrated in with copies of the leading ${pers(leader).key}s' brains. Same brain, different personality.`, source: "sim" });
-    } });
-  }
-  if (n < 12) for (let i = 0; i < 12; i++) addCell(rnd(), rnd(), 0.9, 1 + ((rnd() * P.length) | 0), 0, -1);
-  if (steps % 120 === 0) sample();
+Decide what to do next, true to your personality. Actions: eat, rest, wander, follow NAME, flee NAME, attack NAME (steal their energy), share NAME (give them some of your energy).
+Reply with only JSON: {"action": "<one action>", "target": "<a name you can see, or empty>", "say": "<what you say out loud, at most 10 words, or empty>", "thought": "<your private reason, at most 12 words>"}`;
 }
-function forNeighbors(i, r, fn) {
-  const gx = gIdx(cx[i]), gy = gIdx(cy[i]);
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-    const ax = gx + dx, ay = gy + dy; if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) continue;
-    for (let j = cHead[ax * GRID + ay]; j !== -1; j = cNext[j]) {
-      if (j === i || j >= n) continue;
-      const ddx = cx[j] - cx[i], ddy = cy[j] - cy[i]; if (ddx * ddx + ddy * ddy < r * r) fn(j);
-    }
+function parseDecision(raw) {
+  let o = null; const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+  if (s >= 0 && e > s) { try { o = JSON.parse(raw.slice(s, e + 1)); } catch { /* lenient below */ } }
+  if (!o) { const m = raw.match(/\b(eat|rest|wander|follow|flee|attack|share)\b\s*([A-Z][a-z]+)?/i); o = m ? { action: m[1], target: m[2] || "" } : {}; }
+  let action = String(o.action || "").toLowerCase().trim(), target = String(o.target || "").trim();
+  const sp = action.split(/\s+/); if (sp.length > 1 && !target) { action = sp[0]; target = sp.slice(1).join(" "); }
+  if (!ACTIONS.includes(action)) action = "eat";
+  return { action, target, say: String(o.say || "").slice(0, 80), thought: String(o.thought || "").slice(0, 100) };
+}
+function fallbackDecision(c) {
+  const p = perceive(c), P = c.personality.toLowerCase(), last = c.memory[0];
+  const attacker = last && /attacked me/.test(last.text) && simT - last.t < 15 ? last.text.split(" ")[0] : null;
+  if (attacker && byName(attacker)) return /bully|guard|joker|scheme/.test(P) ? { action: "attack", target: attacker, say: "You'll regret that!", thought: "hit back" } : { action: "flee", target: attacker, say: "Leave me alone!", thought: "get away" };
+  if (c.energy < 0.45) return { action: "eat", target: "", say: "", thought: "hungry" };
+  const weak = p.others.find(e => e.o.energy < 0.35);
+  if (weak && /generous|kind|peace|loyal/.test(P) && c.energy > 0.6) return { action: "share", target: weak.o.name, say: "Here, take some.", thought: "they look hungry" };
+  if (weak && /bully|takes/.test(P)) return { action: "attack", target: weak.o.name, say: "Mine now.", thought: "easy target" };
+  if (/lone|hates company/.test(P) && p.others[0] && p.others[0].d < 0.15) return { action: "flee", target: p.others[0].o.name, say: "", thought: "too crowded" };
+  if (/lazy|nap/.test(P) && c.energy > 0.7) return { action: "rest", target: "", say: "", thought: "nap time" };
+  if (/curious|explorer|meeting/.test(P) && p.others[0]) return { action: "follow", target: p.others[0].o.name, say: "Hi there!", thought: "let's meet" };
+  return { action: c.energy > 0.85 ? "wander" : "eat", target: "", say: "", thought: "" };
+}
+function applyDecision(c, d, meta) {
+  if (!c.alive) return;
+  if (NEEDS_TARGET.has(d.action) && (!byName(d.target) || byName(d.target) === c)) { d.action = "eat"; d.target = ""; }
+  c.action = { type: d.action, target: NEEDS_TARGET.has(d.action) ? byName(d.target).name : null };
+  c.thought = d.thought; c.decisions++; c.ai = meta.ai; c.lastMeta = meta; c.lastTurn = simT; c.urgent = false;
+  if (c.whisper) { remember(c, `A voice from the sky told me: "${c.whisper}"`); c.whisper = null; }
+  if (d.say) {
+    c.say = { text: d.say, until: performance.now() + 4500 };
+    story(`${c.name}: “${d.say}”`, "say");
+    for (const o of C) if (o.alive && o !== c && dist(o, c) < SEE) remember(o, `${c.name} said "${d.say}"`);
+  }
+  if (d.action === "attack" || d.action === "flee") { const T = byName(c.action.target); if (T) { remember(T, d.action === "attack" ? `${c.name} is coming at me` : `${c.name} is running from me`); if (d.action === "attack") T.urgent = true; } }
+}
+let model = null, NAT = null, stats = { n: 0, ms: 0, tok: 0 }, stopLoop = false;
+async function turnLoop() {
+  while (!stopLoop) {
+    const alive = C.filter(c => c.alive);
+    if (!alive.length || !running) { await sleep(300); continue; }
+    const c = alive.sort((a, b) => (b.urgent - a.urgent) || (!!b.whisper - !!a.whisper) || (a.lastTurn - b.lastTurn))[0];
+    if (model) {
+      const t = performance.now(); let r = null;
+      try { r = await NAT.ask(model, buildPrompt(c), { maxNewTokens: 70 }); } catch (e) { console.warn(e); }
+      if (r) { stats.n++; stats.ms += r.ms; stats.tok += r.tokens; applyDecision(c, parseDecision(r.raw), { ai: true, ms: r.ms, raw: r.raw }); }
+      else applyDecision(c, fallbackDecision(c), { ai: false });
+      const spent = performance.now() - t; if (spent < 150) await sleep(150 - spent);
+    } else { applyDecision(c, fallbackDecision(c), { ai: false }); await sleep(900); }
   }
 }
-function flash(i, j, type) { if (flashes.length < 200) flashes.push({ x1: cx[i], y1: cy[i], x2: cx[j], y2: cy[j], type, t: 0 }); }
-function interact() {
-  rebin();
-  for (let i = 0; i < n; i++) {
-    const pp = pers(lin[i]), st = SPS[lin[i] - 1];
-    if (pp.bite && energy[i] < 1.4) forNeighbors(i, TOUCH, j => {
-      if (lin[j] === lin[i] || energy[j] <= 0 || steps - lastBit[j] < 20) return;
-      const take = Math.min(0.12, energy[j]); energy[j] -= take; energy[i] += take * 0.5; lastBit[j] = steps; lastBite[i] = steps; st.bites++; flash(i, j, "bite");
-    });
-    if (pp.share && energy[i] > 0.7) {
-      let best = -1; forNeighbors(i, CROWD, j => { if (lin[j] === lin[i] && energy[j] < 0.4 && (best < 0 || energy[j] < energy[best])) best = j; });
-      if (best >= 0) { energy[i] -= 0.006; energy[best] += 0.006; st.shares++; if (steps % 6 === 0) flash(i, best, "share"); }
-    }
-  }
-}
-function scavenge(dead) {
-  let best = -1, bd = SENSE * SENSE;
-  for (let j = 0; j < n; j++) { if (j === dead || !pers(lin[j]).scav) continue; const d = (cx[j] - cx[dead]) ** 2 + (cy[j] - cy[dead]) ** 2; if (d < bd) { bd = d; best = j; } }
-  if (best >= 0) { energy[best] = Math.min(1.6, energy[best] + 0.3); SPS[lin[best] - 1].scav++; flash(best, dead, "scav"); }
-  else if (rnd() < 0.5) addFood(cx[dead], cy[dead]);
-}
-function sample() {
-  const perMin = n ? foodEvents / n * 30 : 0;
-  history.push({ t: steps, food: perMin, aim: aimN ? aimSum / aimN : 0 });
-  if (history.length > 400) history.shift();
-  foodEvents = 0; aimSum = 0; aimN = 0;
-}
-function counts() { const c = new Array(P.length).fill(0); for (let i = 0; i < n; i++) c[lin[i] - 1]++; return c; }
-function leaderId() { const c = counts(); return c.indexOf(Math.max(...c)) + 1; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const GEN_A = ["Vermis", "Natator", "Globulus", "Cursor", "Venator", "Errans", "Cellula", "Spira", "Lucidus", "Vorax", "Sitiens", "Quaerens", "Nomas", "Pabulator"];
-const EPI_A = ["fluorescens", "rapax", "gregarius", "solitarius", "velox", "tardus", "famelicus", "audax", "timidus", "pulsans", "vagans", "sagax", "obscurus", "aureus"];
-const latinName = id => `${GEN_A[id % GEN_A.length]} ${EPI_A[(id * 5) % EPI_A.length]}`;
-const spName = id => names.get(id) || latinName(id);
-const spColor = (id, l = 60) => `hsl(${pers(id).hue} 90% ${l}%)`;
-
-// ======================= rendering =======================
-const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), ov = document.getElementById("ov"), octx = ov.getContext("2d");
-let S = 800;
-function resize() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); S = Math.max(200, Math.round(Math.min(r.width, r.height) * d)); cv.width = S; cv.height = S; ov.width = S; ov.height = S; }
+// ===================== rendering =====================
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let S = 800; const fx = [];
+function resize() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); S = Math.max(200, Math.round(Math.min(r.width, r.height) * d)); cv.width = S; cv.height = S; }
 addEventListener("resize", resize);
-let bubble = null;
+const col = (c, l = 62) => c.alive ? `hsl(${c.hue} 85% ${l}%)` : "#4b5563";
+const ACOL = { attack: "#ff5c7a", share: "#4dffe1", follow: "rgba(230,237,243,.55)", flee: "#ffb84d" };
 function draw() {
-  ctx.fillStyle = "rgba(10,14,20,0.6)"; ctx.fillRect(0, 0, S, S);
-  ctx.fillStyle = "rgba(255,244,214,0.8)"; const fs = Math.max(2.5, S / 220);
-  for (let k = 0; k < nf; k++) ctx.fillRect(fx[k] * S - fs / 2, fy[k] * S - fs / 2, fs, fs);
-  const r = Math.max(3.5, S / 120);
-  octx.clearRect(0, 0, S, S);
-  octx.strokeStyle = "#3a4a63"; octx.lineWidth = Math.max(2, S / 300); octx.strokeRect(1, 1, S - 2, S - 2);
-  for (let f = flashes.length - 1; f >= 0; f--) {
-    const F = flashes[f]; F.t++; if (F.t > 40) { flashes.splice(f, 1); continue; }
-    octx.globalAlpha = 1 - F.t / 40; octx.lineWidth = Math.max(2, S / 350);
-    octx.strokeStyle = F.type === "bite" ? "#ff4d6d" : F.type === "share" ? "#4dffe1" : "#c08bff";
-    octx.beginPath(); octx.moveTo(F.x1 * S, F.y1 * S); octx.lineTo(F.x2 * S, F.y2 * S); octx.stroke();
-    if (F.type !== "share") { octx.beginPath(); octx.arc(F.x2 * S, F.y2 * S, r * (1.5 + F.t / 10), 0, 6.2832); octx.stroke(); }
-    octx.globalAlpha = 1;
+  ctx.fillStyle = "#05080c"; ctx.fillRect(0, 0, S, S);
+  ctx.strokeStyle = "#243044"; ctx.lineWidth = Math.max(2, S / 300); ctx.strokeRect(WALL * S * .5, WALL * S * .5, S - WALL * S, S - WALL * S);
+  ctx.fillStyle = "rgba(255,244,214,.85)"; const fs = Math.max(3, S / 160);
+  for (const f of food) { ctx.beginPath(); ctx.arc(f.x * S, f.y * S, fs / 2, 0, 6.283); ctx.fill(); }
+  const r = Math.max(8, S / 55);
+  // intent lines
+  for (const c of C) {
+    if (!c.alive || !c.action.target) continue; const T = byName(c.action.target); if (!T) continue;
+    ctx.strokeStyle = ACOL[c.action.type] || "#888"; ctx.lineWidth = Math.max(1.5, S / 450); ctx.setLineDash(c.action.type === "follow" ? [6, 6] : []);
+    ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(c.x * S, c.y * S); ctx.lineTo(T.x * S, T.y * S); ctx.stroke(); ctx.globalAlpha = 1; ctx.setLineDash([]);
   }
-  let sel = -1;
-  for (let i = 0; i < n; i++) {
-    if (uid[i] === selectedUid) sel = i;
-    ctx.fillStyle = spColor(lin[i], 45 + Math.min(1, energy[i]) * 25);
-    ctx.beginPath(); ctx.arc(cx[i] * S, cy[i] * S, r, 0, 6.2832); ctx.fill();
+  for (let k = fx.length - 1; k >= 0; k--) { const F = fx[k], age = simT - F.t; if (age > 1) { fx.splice(k, 1); continue; }
+    ctx.strokeStyle = F.type === "attack" ? "#ff5c7a" : "#4dffe1"; ctx.lineWidth = 3; ctx.globalAlpha = 1 - age; ctx.beginPath(); ctx.arc(F.b.x * S, F.b.y * S, r * (1.2 + age * 2), 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
+  const fsz = Math.max(11, S / 62);
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const c of C) {
+    if (!c.alive && simT - c.diedAt > 15) continue;
+    const x = c.x * S, y = c.y * S;
+    ctx.globalAlpha = c.alive ? 1 : Math.max(0.15, 1 - (simT - c.diedAt) / 15);
+    if (c === selected) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.6, 0, 6.283); ctx.stroke(); }
+    ctx.fillStyle = col(c); ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+    if (c.alive) { ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = Math.max(2, r / 4); ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth, -Math.PI / 2, -Math.PI / 2 + 6.283 * Math.min(1, c.energy)); ctx.stroke(); }
+    ctx.font = `600 ${fsz}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = c.alive ? "#e6edf3" : "#6b7280";
+    ctx.fillText(c.alive ? c.name : c.name + " ✝", x, y + r + 6);
+    if (c.alive) { ctx.font = `${fsz * .85}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = "#8b98a9"; ctx.fillText(c.action.type + (c.action.target ? " " + c.action.target : ""), x, y + r + 6 + fsz * 1.15); }
+    ctx.globalAlpha = 1;
   }
-  if (sel >= 0) {
-    const x = cx[sel] * S, y = cy[sel] * S, c = octx;
-    c.strokeStyle = "#fff"; c.lineWidth = Math.max(1.5, S / 500); c.beginPath(); c.arc(x, y, r * 3, 0, 6.2832); c.stroke();
-    c.globalAlpha = 0.3; c.setLineDash([4, 6]); c.beginPath(); c.arc(x, y, SENSE * S, 0, 6.2832); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
-    sense(sel, inBuf);
-    if (inBuf[2] > 0) { const d = (1 - inBuf[2]) * SENSE * S; c.strokeStyle = "#fff4d6"; c.beginPath(); c.moveTo(x, y); c.lineTo(x + inBuf[0] * d, y + inBuf[1] * d); c.stroke(); }
-    if (bubble && bubble.uid === uid[sel] && performance.now() < bubble.until) drawBubble(x, y - r * 3.5, bubble.text, bubble.ai);
-  } else if (n) {
-    let pick = -1;
-    for (let i = 0; i < n; i++) if (lin[i] === followLin) { pick = i; break; }
-    if (pick < 0) { const L = leaderId(); for (let i = 0; i < n; i++) if (lin[i] === L) { pick = i; break; } }
-    if (pick >= 0) { if (selectedUid) followNote = true; selectedUid = uid[pick]; followLin = lin[pick]; lastThought = 0; }
-  }
-  return sel;
+  for (const c of C) if (c.alive && c.say && performance.now() < c.say.until) bubble(c.x * S, c.y * S - r - 6, c.say.text, c.ai);
 }
-function drawBubble(x, y, text, ai) {
-  const c = octx, fsz = Math.max(12, S / 60), pad = fsz * 0.6, maxW = S * 0.42;
-  c.font = `${fsz}px ui-sans-serif,system-ui,sans-serif`;
+function bubble(x, y, text, ai) {
+  const fsz = Math.max(12, S / 58), pad = fsz * .55, maxW = S * .34;
+  ctx.font = `${fsz}px ui-sans-serif,system-ui,sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
   const words = text.split(/\s+/), lines = []; let line = "";
-  for (const w of words) { const t = line ? line + " " + w : w; if (c.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
-  if (line) lines.push(line); if (lines.length > 4) { lines.length = 4; lines[3] += "…"; }
-  const w = Math.max(...lines.map(l => c.measureText(l).width)) + pad * 2, h = lines.length * fsz * 1.25 + pad * 2;
-  const bx = Math.min(S - w - 4, Math.max(4, x - w / 2)); let by = y - h - 10; if (by < 4) by = y + 40;
-  c.fillStyle = "rgba(17,23,34,0.95)"; c.strokeStyle = ai ? "#4dff88" : "#3a4a63"; c.lineWidth = 1.5;
-  c.beginPath(); if (c.roundRect) c.roundRect(bx, by, w, h, 8); else c.rect(bx, by, w, h); c.fill(); c.stroke();
-  c.fillStyle = "#e6edf3"; c.textBaseline = "top";
-  lines.forEach((l, k) => c.fillText(l, bx + pad, by + pad + k * fsz * 1.25));
-}
-
-const bc = document.getElementById("brain"), bctx = bc.getContext("2d");
-function drawBrain(i) {
-  const d = Math.min(2, devicePixelRatio || 1), w = bc.clientWidth * d, h = bc.clientHeight * d;
-  if (!w) return;
-  if (bc.width !== w || bc.height !== h) { bc.width = w; bc.height = h; }
-  bctx.clearRect(0, 0, w, h);
-  if (i < 0) return;
-  const inp = new Float32Array(NI), hid = new Float32Array(NH), out = new Float32Array(NO);
-  sense(i, inp); think(i, inp, hid, out);
-  const fsz = 11 * d, xi = 76 * d, xh = w * 0.52, xo = w - 96 * d;
-  const yi = k => 8 * d + (h - 16 * d) * (k + .5) / NI, yh = k => 8 * d + (h - 16 * d) * (k + .5) / NH, yo = k => h / 2 + (k - .5) * 56 * d;
-  const o = i * NW, ob = o + NI * NH;
-  const edge = (x1, y1, x2, y2, wt, act) => {
-    const a = Math.min(1, Math.abs(wt * act)) * 0.85 + 0.05;
-    bctx.strokeStyle = wt >= 0 ? `rgba(77,195,255,${a})` : `rgba(255,92,122,${a})`; bctx.lineWidth = Math.min(3, 0.4 + Math.abs(wt)) * d;
-    bctx.beginPath(); bctx.moveTo(x1, y1); bctx.lineTo(x2, y2); bctx.stroke();
-  };
-  for (let hh = 0; hh < NH; hh++) for (let k = 0; k < NI; k++) edge(xi, yi(k), xh, yh(hh), W[o + hh * NI + k], inp[k]);
-  for (let q = 0; q < NO; q++) for (let hh = 0; hh < NH; hh++) edge(xh, yh(hh), xo, yo(q), W[ob + q * NH + hh], hid[hh]);
-  const node = (x, y, v) => { bctx.fillStyle = v >= 0 ? `rgba(77,195,255,${0.25 + 0.75 * Math.min(1, v)})` : `rgba(255,92,122,${0.25 + 0.75 * Math.min(1, -v)})`; bctx.beginPath(); bctx.arc(x, y, 5 * d, 0, 6.2832); bctx.fill(); bctx.strokeStyle = "#8b98a9"; bctx.lineWidth = d; bctx.stroke(); };
-  bctx.font = `${fsz}px ui-sans-serif,system-ui,sans-serif`; bctx.textBaseline = "middle";
-  for (let k = 0; k < NI; k++) { node(xi, yi(k), inp[k]); bctx.fillStyle = "#8b98a9"; bctx.textAlign = "right"; bctx.fillText(IN_LABELS[k], xi - 9 * d, yi(k)); }
-  for (let hh = 0; hh < NH; hh++) node(xh, yh(hh), hid[hh]);
-  for (let q = 0; q < NO; q++) { node(xo, yo(q), out[q]); bctx.fillStyle = "#e6edf3"; bctx.textAlign = "left"; bctx.fillText(`${OUT_LABELS[q]} ${out[q] >= 0 ? "+" : ""}${out[q].toFixed(2)}`, xo + 9 * d, yo(q)); }
-}
-function cellHeader(i) {
-  $("cellinfo").innerHTML = `<span><b style="color:${spColor(lin[i])}">${esc(pers(lin[i]).key)}</b> · ${esc(spName(lin[i]))}</span><span>gen <b>${gen[i]}</b></span><span>energy <b>${energy[i].toFixed(2)}</b></span><span>ate <b>${eaten[i]}</b></span><span>children <b>${kids[i]}</b></span><span>age <b>${Math.round(age[i] / 60)} s</b></span>${followNote ? "<span>(your cell died; following a relative)</span>" : ""}`;
+  for (const w of words) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+  if (line) lines.push(line);
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad * 2, h = lines.length * fsz * 1.25 + pad * 2;
+  const bx = Math.min(S - w - 4, Math.max(4, x - w / 2)), by = Math.max(4, y - h);
+  ctx.fillStyle = "rgba(17,23,34,.95)"; ctx.strokeStyle = ai ? "#4dff88" : "#3a4a63"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 8); else ctx.rect(bx, by, w, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#e6edf3"; lines.forEach((l, k) => ctx.fillText(l, bx + pad, by + pad + k * fsz * 1.25));
+  ctx.textAlign = "center";
 }
 cv.addEventListener("click", e => {
-  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-  let best = 1e9, bi = -1;
-  for (let i = 0; i < n; i++) { const d = (cx[i] - x) ** 2 + (cy[i] - y) ** 2; if (d < best) { best = d; bi = i; } }
-  if (bi >= 0) { selectedUid = uid[bi]; followLin = lin[bi]; followNote = false; lastThought = 0; showTab("cell"); }
+  const b = cv.getBoundingClientRect(), x = (e.clientX - b.left) / b.width, y = (e.clientY - b.top) / b.height;
+  let best = null, bd = 0.05; for (const c of C) { const d = Math.hypot(c.x - x, c.y - y); if (d < bd) { bd = d; best = c; } }
+  if (best) { selected = best; showTab("mind"); renderMind(); }
+  else { for (let k = 0; k < 4; k++) food.push({ x: clampIn(x + (rnd() - .5) * .04), y: clampIn(y + (rnd() - .5) * .04) }); }
 });
 
-const sp = document.getElementById("spark"), sctx = sp.getContext("2d");
-function drawSpark() {
-  const d = Math.min(2, devicePixelRatio || 1), w = sp.clientWidth * d, h = sp.clientHeight * d;
-  if (!w) return;
-  if (sp.width !== w || sp.height !== h) { sp.width = w; sp.height = h; }
-  sctx.clearRect(0, 0, w, h); if (history.length < 2) return;
-  const maxF = Math.max(1, ...history.map(p => p.food)), X = k => k / (history.length - 1) * w;
-  for (const m of marks) { const k = history.findIndex(p => p.t >= m); if (k >= 0) { sctx.strokeStyle = "#ffb84d"; sctx.beginPath(); sctx.moveTo(X(k), 0); sctx.lineTo(X(k), h); sctx.stroke(); } }
-  const line = (f, col) => { sctx.strokeStyle = col; sctx.lineWidth = 1.5 * d; sctx.beginPath(); history.forEach((p, k) => { const y = h - 3 * d - f(p) * (h - 6 * d); k ? sctx.lineTo(X(k), y) : sctx.moveTo(X(k), y); }); sctx.stroke(); };
-  line(p => p.food / maxF, "#4dff88"); line(p => (p.aim + 1) / 2, "#4dc3ff");
-}
-
-// ======================= UI =======================
+// ===================== panels =====================
 const $ = id => document.getElementById(id);
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-function showTab(t) { for (const k of ["cell", "species", "bonsai"]) { $("tab-" + k).setAttribute("aria-selected", k === t); $("pane-" + k).hidden = k !== t; } panelT = 0; }
-for (const k of ["cell", "species", "bonsai"]) $("tab-" + k).onclick = () => showTab(k);
-function updatePanels() {
-  const c = counts(); let maxG = 0; for (let i = 0; i < n; i++) maxG = Math.max(maxG, gen[i]);
-  const last = history[history.length - 1];
-  $("sPop").textContent = n; $("sLin").textContent = c.filter(x => x).length + "/" + P.length; $("sGen").textContent = maxG;
-  $("sAim").textContent = last ? Math.round((last.aim + 1) * 50) + "%" : "–";
-  const sec = steps / 60; $("sTime").textContent = sec < 60 ? Math.round(sec) + " s" : Math.floor(sec / 60) + "m " + String(Math.round(sec % 60)).padStart(2, "0") + "s";
-  $("strip").innerHTML = P.map((pp, k) => `<div class="chip${c[k] ? "" : " dead"}" data-k="${k}" title="${esc(pp.blurb)}"><i class="sw" style="background:${spColor(k + 1)}"></i><b>${esc(pp.key)}</b><span>${c[k]}</span></div>`).join("");
-  if (!$("pane-species").hidden) {
-    $("species").innerHTML = P.map((pp, k) => {
-      const st = SPS[k], col = spColor(k + 1), life = st.deaths ? Math.round(st.lifeSum / st.deaths / 60) + " s" : "–";
-      const acts = pp.bite ? ` · ${st.bites} bites` : pp.share ? ` · ${st.shares} shares` : pp.scav ? ` · ${st.scav} scavenged` : "";
-      return `<div class="sp${c[k] ? "" : " dead"}"><i class="sw" style="background:${col}"></i>
-        <div><div><b style="color:${col}">${esc(pp.key)}</b> · <em>${esc(spName(k + 1))}</em>${pp.invented ? ' · <span class="tag ai">invented</span>' : ""}</div>
-        <div class="why">${esc(pp.blurb)}</div>
-        <div class="facts">avg life ${life} · ${st.births} born · died: ${st.starved} starved, ${st.eaten} eaten, ${st.old} old age${acts}</div></div>
-        <span class="cnt">${c[k]}</span></div>`;
-    }).join("");
-    drawSpark();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function showTab(t) { for (const k of ["mind", "story", "cast"]) { $("tab-" + k).setAttribute("aria-selected", k === t); $("pane-" + k).hidden = k !== t; } }
+for (const k of ["mind", "story", "cast"]) $("tab-" + k).onclick = () => showTab(k);
+function story(text, kind) {
+  const e = document.createElement("div"); e.className = "ev " + (kind || "");
+  e.innerHTML = `<span class="t">${fmtT(simT)}</span>${esc(text)}`;
+  const f = $("feed"); f.prepend(e); while (f.children.length > 120) f.lastChild.remove();
+}
+function renderMind() {
+  const c = selected; if (!c) return;
+  $("mDot").style.background = col(c); $("mName").textContent = c.name + (c.alive ? "" : " (dead)"); $("mPers").textContent = c.personality; $("wName").textContent = c.name;
+  $("mEnergy").textContent = Math.round(c.energy * 100) + "%"; $("mBar").style.width = Math.min(100, c.energy * 100) + "%"; $("mBar").style.background = col(c);
+  $("mAction").innerHTML = c.decisions ? `<b>${esc(c.action.type)}${c.action.target ? " " + esc(c.action.target) : ""}</b>` : "Waiting for its first turn…";
+  const meta = c.lastMeta ? (c.lastMeta.ai ? `<span class="tag ai">Bonsai 2B · ${(c.lastMeta.ms / 1000).toFixed(1)} s</span>` : `<span class="tag">rule fallback</span>`) : "";
+  $("mThought").innerHTML = (c.thought ? `“${esc(c.thought)}” ` : "") + meta;
+  $("mDecision").className = "card" + (c.lastMeta && c.lastMeta.ai ? " ai" : "");
+  $("mMem").innerHTML = c.memory.length ? c.memory.map(m => `<li>${esc(m.text)} <span style="color:var(--muted)">· ${Math.round(simT - m.t)} s ago</span></li>`).join("") : "<li style='color:var(--muted)'>Nothing yet.</li>";
+  const fe = Object.entries(c.feelings).filter(([, v]) => v);
+  $("mFeel").innerHTML = fe.length ? fe.map(([k, v]) => `<span style="color:${v < 0 ? "var(--neg)" : "var(--teal)"}">${feelWord(v)} ${esc(k)}</span>`).join("") : "<span style='color:var(--muted)'>No strong feelings yet.</span>";
+}
+function renderCast() {
+  $("cast").innerHTML = C.map((c, k) => `<div class="cm${c.alive ? "" : " dead"}" data-k="${k}"><span class="dot" style="background:${col(c)}"></span>
+    <div><div><b>${esc(c.name)}</b> <span style="color:var(--muted);font-size:12px">${esc(c.personality)}</span></div><div class="act">${c.alive ? esc(c.action.type + (c.action.target ? " " + c.action.target : "")) + (c.thought ? " · “" + esc(c.thought) + "”" : "") : "dead"}</div></div>
+    <div><div class="bar"><div style="width:${Math.min(100, c.energy * 100)}%;background:${col(c)}"></div></div></div></div>`).join("");
+}
+$("cast").addEventListener("click", e => { const m = e.target.closest(".cm"); if (!m) return; selected = C[+m.dataset.k]; showTab("mind"); renderMind(); });
+$("whisperBtn").onclick = () => {
+  const c = selected, t = $("whisper").value.trim(); if (!c || !t || !c.alive) return;
+  c.whisper = t; c.urgent = true; story(`A voice from the sky whispered to ${c.name}: “${t}”`, "god");
+  $("whisperOut").textContent = model ? `${c.name} will hear it on its next turn.` : `${c.name} heard it (Bonsai isn't awake, so it can't really react yet).`;
+};
+$("addBtn").onclick = async () => {
+  const desc = $("newDesc").value.trim(); if (!desc) return;
+  const btn = $("addBtn"); btn.disabled = true; btn.textContent = model ? "Bonsai is writing it…" : "Adding…";
+  let name = null, pers = desc, src = "fallback";
+  if (model) {
+    try {
+      const r = await NAT.ask(model, `Invent a small creature for a petri-dish village from this description: "${desc}". Existing names: ${C.map(c => c.name).join(", ")}.\nReply with only JSON: {"name": "<a short, new, one-word name>", "personality": "<one line starting with 'a', under 14 words>"}`, { maxNewTokens: 60 });
+      const s = r.raw.indexOf("{"), e = r.raw.lastIndexOf("}"); const o = JSON.parse(r.raw.slice(s, e + 1));
+      if (o.name) { name = String(o.name).replace(/[^\w\- ]/g, "").slice(0, 12); pers = String(o.personality || desc).slice(0, 120); src = "Bonsai 2B"; }
+    } catch (e) { console.warn(e); }
   }
-}
-$("strip").addEventListener("click", e => { const ch = e.target.closest(".chip"); if (!ch) return; const k = +ch.dataset.k; for (let i = 0; i < n; i++) if (lin[i] === k + 1) { selectedUid = uid[i]; followLin = k + 1; followNote = false; lastThought = 0; showTab("cell"); break; } });
-function note({ text, source, extra }) {
-  const e = document.createElement("div"); e.className = "entry" + (source === "ai" ? " ai" : "");
-  e.innerHTML = `<div class="top2"><span>${Math.round(steps / 60)} s into the dish</span><span class="tag ${source === "ai" ? "ai" : ""}">${source === "ai" ? "Bonsai 2B" + (extra ? " · " + extra : "") : source === "sim" ? "dish" : "fallback"}</span></div><div>${esc(text)}</div>`;
-  const f = $("feed"); f.prepend(e); while (f.children.length > 40) f.lastChild.remove();
-}
-const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 1, acc = 0, panelT = 0;
+  if (!name) name = ["Nyx", "Bo", "Quill", "Fen", "Zara", "Odo"][(rnd() * 6) | 0];
+  name = uniqueName(name.charAt(0).toUpperCase() + name.slice(1));
+  const c = makeCreature(name, pers, (HUES[(nextHue++) % HUES.length] + 23) % 360); C.push(c); selected = c;
+  story(`${name} joined the village: ${pers}.`, "god");
+  $("addOut").innerHTML = `${esc(name)} added <span class="tag ${src === "fallback" ? "" : "ai"}">${src}</span>`;
+  btn.disabled = false; btn.textContent = "Add to village";
+};
+const SPEEDS = [0.5, 1, 1.5, 2]; let running = true, speed = 1;
 $("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
 $("speed").oninput = e => { speed = SPEEDS[+e.target.value]; $("speedv").textContent = speed + "×"; };
-$("reset").onclick = () => newDish();
-$("scramble").onclick = () => { for (let k = 0; k < n * NW; k++) W[k] = gauss() * 0.8; marks.push(steps); note({ text: "Every brain was replaced with a random one. Species keep their personalities, but everything their brains learned is gone. Watch steering toward food drop, then climb back as evolution relearns it.", source: "sim" }); };
+$("feast").onclick = () => { for (let k = 0; k < 30; k++) food.push({ x: clampIn(rnd()), y: clampIn(rnd()) }); story("A feast fell from the sky.", "god"); C.forEach(c => c.urgent = true); };
+$("famine").onclick = () => { food = []; famineUntil = simT + 20; story("Famine: every crumb vanished, and nothing will grow for 20 seconds.", "god"); C.forEach(c => { if (c.alive) remember(c, "All the food suddenly vanished"); c.urgent = true; }); };
+$("reset").onclick = () => newVillage();
 
-// ======================= Bonsai =======================
-let model = null, NAT = null, queue = Promise.resolve();
-const bonsai = (prompt, maxNewTokens) => (queue = queue.then(() => NAT.ask(model, prompt, { maxNewTokens })).catch(e => { console.warn(e); return null; }));
-const jsonOf = raw => { const s = raw.indexOf("{"), e = raw.lastIndexOf("}"); if (s < 0 || e <= s) return null; try { return JSON.parse(raw.slice(s, e + 1)); } catch { return null; } };
-
-// 1. a cell's inner voice, grounded in its real state
-let lastThought = 0, thinking = false;
-function cellState(i) {
-  sense(i, inBuf); think(i, inBuf, hidBuf, outBuf);
-  const dir = (x, y) => Math.abs(x) < 0.15 && Math.abs(y) < 0.15 ? "nowhere" : ([y < -0.4 ? "up" : y > 0.4 ? "down" : "", x > 0.4 ? "right" : x < -0.4 ? "left" : ""].filter(Boolean).join("-") || "nowhere");
-  return { personality: pers(lin[i]).key, trait: pers(lin[i]).blurb, energy: +energy[i].toFixed(2), hungry: energy[i] < 0.35,
-    sees_food: inBuf[2] > 0 ? dir(inBuf[0], inBuf[1]) + (inBuf[2] > 0.7 ? " (very close)" : "") : "none in sight",
-    neighbors: senseInfo.cn, relatives_nearby: senseInfo.kin, hunter_nearby: senseInfo.biter >= 0,
-    was_bitten_recently: lastBit[i] > 0 && steps - lastBit[i] < 120, just_bit_someone: lastBite[i] > 0 && steps - lastBite[i] < 120,
-    brain_decides_to_move: dir(outBuf[0], outBuf[1]), age_s: Math.round(age[i] / 60), children: kids[i], generation: gen[i] };
+// ===================== waking Bonsai (automatic) =====================
+function stubModel() {   // ?stub=1: a fake model for offline testing of the UI; never used on the real page
+  return { stub: true, async ask(prompt) { await sleep(250); const names = [...prompt.matchAll(/^- ([A-Z][a-zA-Z ]+?):/gm)].map(m => m[1]); const a = names.length && Math.random() < .5 ? ["follow", "attack", "share", "flee"][(Math.random() * 4) | 0] : "eat"; return { raw: JSON.stringify({ action: a, target: names[0] || "", say: Math.random() < .3 ? "stub says hi" : "", thought: "stub" }), ms: 250, tokens: 20, tps: 80 }; } };
 }
-function fallbackThought(s) {
-  if (s.was_bitten_recently) return "Ow. Something bit me. I need to get out of here.";
-  if (s.hunter_nearby) return "A hunter is close. Keep moving.";
-  if (s.just_bit_someone) return "Got one. That's lunch.";
-  if (s.hungry && s.sees_food !== "none in sight") return `Starving. Food ${s.sees_food}, going for it.`;
-  if (s.hungry) return "So hungry, and nothing in sight.";
-  if (s.relatives_nearby >= 2) return "Family's all around me. Feels safe.";
-  return s.sees_food !== "none in sight" ? `Food ${s.sees_food}.` : "Just drifting. Looking for food.";
-}
-async function updateThought(i) {
-  if (thinking) return; thinking = true;
-  try {
-    const id = uid[i], s = cellState(i);
-    let text = fallbackThought(s), ai = false, meta = "fallback (wake Bonsai on the Bonsai tab for real thoughts)";
-    if (model) {
-      const r = await bonsai(`You are the inner voice of one tiny cell in an artificial-life petri dish. Its real, current state:\n${JSON.stringify(s)}\nWrite its thought right now in first person: one or two short sentences, vivid and in character for its personality, and true to the state above (do not invent events). Reply with only the thought.`, 60);
-      if (r && r.raw.trim()) { text = r.raw.trim().replace(/^["']|["']$/g, "").slice(0, 220); ai = true; meta = `Bonsai 2B · ${r.tps.toFixed(0)} tok/s · ${(r.ms / 1000).toFixed(1)} s`; }
-    }
-    if (selectedUid === id) { bubble = { uid: id, text, until: performance.now() + 7000, ai }; $("thought").className = "thought" + (ai ? " ai" : ""); $("thought").innerHTML = `${esc(text)}<small>${esc(meta)}</small>`; }
-  } finally { thinking = false; }
-}
-
-// 2. invent a species from plain English
-const KNOBS = { base: [0.6, 1.5], speed: [0.5, 1.8], move: [0.5, 2.5], eat: [1, 2], divide: [0.95, 1.5], life: [0.4, 1.8] };
-function sanitize(t, text) {
-  const out = { key: String(t.name || "Newcomer").replace(/[^\w\- ]/g, "").slice(0, 16) || "Newcomer", blurb: String(t.blurb || text).slice(0, 90) };
-  for (const [k, [lo, hi]] of Object.entries(KNOBS)) { const v = Number(t[k]); if (Number.isFinite(v)) out[k] = Math.min(hi, Math.max(lo, v)); }
-  for (const k of ["bite", "share", "scav", "herd", "loner", "flee"]) if (t[k] === true) out[k] = true;
-  if (out.herd && out.loner) delete out.loner;
-  return out;
-}
-function keywordTraits(text) {
-  const s = text.toLowerCase(), t = { name: (text.match(/\b(?:a|an)\s+([a-z]+)/i)?.[1] || "Newcomer").replace(/^./, c => c.toUpperCase()), blurb: text };
-  if (/hunt|bite|vampire|predator|kill|attack/.test(s)) t.bite = true;
-  if (/shar|generous|feeds? (its |their )?(family|kin|relatives)|kind/.test(s)) t.share = true;
-  if (/dead|scaveng|corpse|carrion/.test(s)) t.scav = true;
-  if (/herd|group|social|swarm|family|pack/.test(s)) t.herd = true;
-  if (/alone|hermit|loner|shy|solitary|hates company/.test(s)) t.loner = true;
-  if (/coward|flee|runs? from|scared|timid/.test(s)) t.flee = true;
-  if (/fast|quick|never stops|restless|speedy/.test(s)) { t.speed = 1.5; t.move = 1.6; }
-  if (/slow|lazy|giant/.test(s)) t.speed = 0.65;
-  if (/long|old|ancient|giant/.test(s)) { t.life = 1.6; t.base = 0.8; }
-  if (/breed|babies|many children|fertile/.test(s)) t.divide = 1.0;
-  if (/steal/.test(s)) t.eat = 1.6;
-  return t;
-}
-async function invent() {
-  const text = $("invent").value.trim(); if (!text) return;
-  if (P.length >= 12) { $("inventOut").textContent = "The dish holds 12 species at most. Start a new dish to invent more."; return; }
-  const btn = $("inventBtn"); btn.disabled = true; btn.textContent = model ? "Bonsai is designing…" : "Hatching…";
-  try {
-    let traits = null, src = "fallback: keyword matching (wake Bonsai for real design)";
-    if (model) {
-      const r = await bonsai(`Design a species for an artificial-life petri dish from this description: "${text}".
-Cells eat food specks, spend energy to live and move, divide when they have enough energy, and each has its own small evolving brain. Choose body traits only from these knobs:
-base (metabolism multiplier, 0.6-1.5), speed (0.5-1.8), move (cost of moving, 0.5-2.5), eat (food reach, 1-2), divide (energy needed to split, 0.95-1.5; lower = breeds faster), life (lifespan multiplier, 0.4-1.8),
-and true/false behaviors: bite (steals energy from other species on contact), share (feeds hungry relatives), scav (eats cells that die nearby), herd (cheaper near relatives), loner (cheaper alone, stressed by neighbors), flee (bolts away from biters).
-Reply with only JSON: {"name": "<one-word species nickname>", "blurb": "<under 12 words: what its traits do>", "base": n, "speed": n, "move": n, "eat": n, "divide": n, "life": n, "bite": bool, "share": bool, "scav": bool, "herd": bool, "loner": bool, "flee": bool}`, 180);
-      const obj = r && jsonOf(r.raw); if (obj) { traits = obj; src = `designed by Bonsai 2B in ${(r.ms / 1000).toFixed(1)} s`; }
-    }
-    if (!traits) traits = keywordTraits(text);
-    const p = sanitize(traits, text); p.hue = (P.length * 47 + 20) % 360; p.invented = true;
-    P.push(p); SPS.push(newStats()); const id = P.length;
-    const leader = leaderId(), donors = []; for (let i = 0; i < n; i++) if (lin[i] === leader) donors.push(i);
-    for (let m = 0; m < 8; m++) addCell(rnd(), rnd(), 1.0, id, 0, donors.length ? donors[(rnd() * donors.length) | 0] : -1);
-    const knobs = Object.keys(KNOBS).filter(k => p[k] !== undefined).map(k => `${k} ${p[k].toFixed(2)}`).concat(["bite", "share", "scav", "herd", "loner", "flee"].filter(k => p[k])).join(", ");
-    const ai = src.startsWith("designed");
-    $("inventOut").innerHTML = `<b style="color:${spColor(id)}">${esc(p.key)}</b> hatched: 8 cells carrying copies of the leading species' brains. Traits: ${esc(knobs || "average")}. <span class="tag ${ai ? "ai" : ""}">${esc(src)}</span>`;
-    note({ text: `A new species hatched from "${text}": the ${p.key}s. ${p.blurb}`, source: ai ? "ai" : "fallback" });
-    selectedUid = 0; followLin = id; followNote = false;
-  } finally { btn.disabled = false; btn.textContent = "Hatch it"; }
-}
-$("inventBtn").onclick = invent;
-document.querySelectorAll("[data-idea]").forEach(b => b.onclick = () => { $("invent").value = b.dataset.idea; });
-
-// 3. field notes every ~30 s of sim time
-let lastNarr = 0, narrating = false;
-function digest() {
-  const c = counts(), last = history[history.length - 1] || { aim: 0 };
-  return { sim_seconds: Math.round(steps / 60), steers_toward_food_pct: Math.round((last.aim + 1) * 50),
-    species: P.map((pp, k) => { const st = SPS[k]; return { personality: pp.key, trait: pp.blurb, alive: c[k], born: st.births, avg_life_s: st.deaths ? Math.round(st.lifeSum / st.deaths / 60) : null, starved: st.starved, eaten: st.eaten, old_age: st.old, bites: st.bites, shares: st.shares, scavenged: st.scav }; }) };
-}
-function fallbackNote(dg) {
-  const alive = dg.species.filter(x => x.alive).sort((a, b) => b.alive - a.alive), worst = [...dg.species].sort((a, b) => (b.starved + b.eaten) - (a.starved + a.eaten))[0];
-  return alive.length ? `The ${alive[0].personality}s lead with ${alive[0].alive} cells. The ${worst.personality}s have lost the most (${worst.starved} starved, ${worst.eaten} eaten). ${dg.steers_toward_food_pct}% of cells that see food now steer toward it.` : "The dish is empty.";
-}
-async function narrate() {
-  if (narrating) return; narrating = true;
-  try {
-    const dg = digest();
-    if (!model) { note({ text: fallbackNote(dg), source: "fallback" }); return; }
-    const r = await bonsai(`You narrate an artificial-life petri dish like a nature documentary. Every cell runs its own tiny evolving neural network; each species has a fixed personality ("trait"). Current stats:\n${JSON.stringify(dg)}\nWrite 2-3 sentences about how the personalities are playing out: who is winning, who is dying and how. Use the numbers. Reply with only the note.`, 140);
-    if (r && r.raw.trim()) note({ text: r.raw.trim().slice(0, 500), source: "ai", extra: `${r.tps.toFixed(0)} tok/s` });
-    else note({ text: fallbackNote(dg), source: "fallback" });
-  } finally { narrating = false; }
-}
-
 async function wake() {
-  const btn = $("wake"), txt = $("wakeText"), pr = $("wakeProg"), bar = $("wakeBar");
-  btn.disabled = true; btn.textContent = "Waking Bonsai…"; pr.hidden = false;
+  const st = $("status");
+  if (new URLSearchParams(location.search).has("stub")) { const s = stubModel(); NAT = { ask: (m, p, o) => s.ask(p, o) }; model = s; $("veil").hidden = true; st.textContent = "Bonsai: STUB (test mode)"; return; }
+  if (!navigator.gpu || new URLSearchParams(location.search).has("rules")) {
+    $("veilTitle").textContent = "This browser can't run Bonsai";
+    $("veilText").textContent = "Bonsai needs WebGPU (Chrome or Edge on a laptop, or Safari 26). The creatures will follow simple built-in rules instead, labeled “rule fallback.”";
+    $("veilBar").parentElement.hidden = true; st.textContent = "Bonsai: unavailable (rules)";
+    setTimeout(() => { $("veil").hidden = true; }, 4000); return;
+  }
   try {
-    NAT = NAT || await import("./naturalist.mjs");
+    NAT = await import("./naturalist.mjs");
     const r = await NAT.loadModel({ vision: false,
-      onProgress: f => { if (f != null) { bar.style.width = (f * 100).toFixed(1) + "%"; txt.textContent = `Downloading Bonsai 2B… ${Math.round(f * NAT.TEXT_MB)} / ${NAT.TEXT_MB} MB`; } },
-      onStatus: m => { txt.textContent = m; } });
-    model = r.model; try { localStorage.setItem("bonsai-cells-wake", "1"); } catch {}
-    $("status").textContent = "Bonsai 2B: awake, on your GPU"; $("status").className = "status on";
-    txt.textContent = `Bonsai 2B is running on your GPU inside this tab (loaded in ${(r.loadMs / 1000).toFixed(1)} s). It voices the cell you follow, designs species you describe, and writes field notes.`;
-    btn.hidden = true; pr.hidden = true; lastThought = 0;
+      onProgress: f => { if (f != null) { $("veilBar").style.width = (f * 100).toFixed(1) + "%"; $("veilText").textContent = `Downloading the model into your browser: ${Math.round(f * NAT.TEXT_MB)} / ${NAT.TEXT_MB} MB. After this it loads from cache in seconds.`; } },
+      onStatus: m => { $("veilTitle").textContent = "Preparing Bonsai on your GPU…"; $("veilText").textContent = m; } });
+    model = r.model; $("veil").hidden = true;
+    st.textContent = "Bonsai 2B: running on your GPU"; st.className = "status on";
+    story(`Bonsai 2B woke up in ${(r.loadMs / 1000).toFixed(1)} s and took over every creature.`, "god");
+    C.forEach(c => c.urgent = true);
   } catch (e) {
-    console.warn(e); btn.disabled = false; btn.textContent = "Try again"; pr.hidden = true;
-    txt.textContent = "Couldn't start Bonsai here: " + (e?.message || e) + " The fallbacks keep running.";
+    console.warn(e); $("veilTitle").textContent = "Couldn't start Bonsai here";
+    $("veilText").textContent = (e?.message || String(e)) + " The creatures will follow simple rules instead."; st.textContent = "Bonsai: failed (rules)";
+    setTimeout(() => { $("veil").hidden = true; }, 5000);
   }
 }
-$("wake").onclick = wake;
-$("status").onclick = () => showTab("bonsai"); $("status").style.cursor = "pointer";
-if (!navigator.gpu) { $("wakeText").textContent = "This browser has no WebGPU, so Bonsai can't run here (Chrome or Edge on a laptop works). Simple fallbacks stand in for it."; $("wake").hidden = true; }
-else { try { if (localStorage.getItem("bonsai-cells-wake") === "1") wake(); } catch {} }
 
-// ======================= loop =======================
-function frame(now) {
-  if (running) { acc += speed; while (acc >= 1) { step(); acc -= 1; } }
-  const sel = draw();
-  if (now - panelT > 300) { panelT = now; updatePanels(); if (sel >= 0) cellHeader(sel); }
-  if (!$("pane-cell").hidden) drawBrain(sel);
-  if (sel >= 0 && now - lastThought > (model ? 6000 : 4000)) { lastThought = now; updateThought(sel); }
-  if (running && steps - lastNarr > 60 * 30) { lastNarr = steps; narrate(); }
+// ===================== loop =====================
+let lastFrame = performance.now(), panelT = 0;
+function frame(t) {
+  const dt = Math.min(0.05, (t - lastFrame) / 1000) * speed; lastFrame = t;
+  if (running && $("veil").hidden) tick(dt);
+  draw();
+  if (t - panelT > 400) {
+    panelT = t; if (!$("pane-mind").hidden) renderMind(); if (!$("pane-cast").hidden) renderCast();
+    $("perf").textContent = stats.n ? `${stats.n} Bonsai decisions · ${(stats.ms / stats.n / 1000).toFixed(1)} s each · ${(stats.tok / (stats.ms / 1000)).toFixed(0)} tok/s` : (model ? "Bonsai is thinking…" : "");
+  }
   requestAnimationFrame(frame);
 }
-window.BL = { get n() { return n; }, get steps() { return steps; }, get history() { return history; }, step, counts, get P() { return P; }, invent, keywordTraits, sanitize };
-resize(); newDish(); requestAnimationFrame(frame);
+window.BV = { get C() { return C; }, get stats() { return stats; }, tick, buildPrompt, parseDecision, fallbackDecision };
+resize(); newVillage(); requestAnimationFrame(frame); wake().then(() => turnLoop());
 </script>
 </body>
 </html>
