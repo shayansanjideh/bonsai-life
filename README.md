@@ -34,3 +34,14 @@ Overrides: `MODEL_PATH`, `MMPROJ_PATH`, `LLAMA_SERVER`, `PORT`, `LLAMA_PORT`, `P
 - `web/index.html`: the simulation (spatial-hash particle life, 6 species, 1,100 particles per universe), rendering, the evolution loop and the UI, with no dependencies.
 - `server.py`: serves the page and proxies `/api/naturalist` to llama-server with `enable_thinking: false` and a JSON schema, then validates the edits.
 - If Bonsai takes longer than 8 s, the next generation starts with a random B, and Bonsai's edits are hot-swapped into B as soon as they arrive.
+
+## Secret messages (`web/secret.html`)
+
+Type a short secret and Bonsai writes an ordinary tweet whose token choices encode it. Paste the tweet into the same page on any device and Bonsai reads it back.
+
+- A step carries a digit only when the top 2 to 4 tokens are all plausible and clearly ahead of the rest; the digit is the chosen token's position among them, sorted by token id. The encoder only uses steps that clear every threshold by a margin (`delta`), so small logit differences between GPUs and browsers don't change what the reader sees.
+- Payload: fixed Huffman code for the secret plus a CRC16, read as one mixed-radix integer. The reader tries each cover topic's prompt and keeps the one whose checksum matches.
+- The Lab tab records a logit fingerprint (compare two devices' reports), sweeps capacity settings and runs encode/decode round trips. URL params override settings, e.g. `secret.html?delta=0.4&W=4`; `?stub` runs a fake model.
+- Tests: `node test/stego.test.mjs` (stub model with injected logit noise; includes a no-margin control that fails).
+
+Prior art: Ziegler et al. 2019 (arithmetic-coding stego), Meteor (2021), Discop (2023), Steganeur. This version's twist is running fully in the browser and surviving cross-device numerics.
