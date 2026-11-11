@@ -1,85 +1,95 @@
-# Kaggle kernel: run the secret-message Lab headlessly on WebGPU backends and save the reports.
-#   backends: NVIDIA T4 through Vulkan (real GPU) and SwiftShader (CPU software GPU).
-# Two different backends on one box = a real cross-device determinism test.
-# Output: /kaggle/working/report_<backend>.json and summary.json
+# Kaggle kernel: test the secret-message page on the real Bonsai model in headless Chromium.
+# 1. Probe which WebGPU adapters Chrome gets (T4 via Vulkan, default, SwiftShader CPU) without loading anything.
+# 2. Load the model on the best one and run short, time-capped tasks, writing summary.json after each,
+#    so a killed or capped run still leaves results. Whole run is capped at ~2.5 h.
 import json, os, subprocess, sys, time, traceback
 
 URL = os.environ.get("SECRET_URL", "https://shayansanjideh.github.io/bonsai-life/secret.html")
 OUT = "/kaggle/working" if os.path.isdir("/kaggle/working") else "."
+DEADLINE = time.time() + float(os.environ.get("BUDGET_S", 9000))
 LOG = open(os.path.join(OUT, "log.txt"), "a")
+summary = {"url": URL}
 def log(*a):
     s = time.strftime("%H:%M:%S ") + " ".join(map(str, a)); print(s, flush=True); LOG.write(s + "\n"); LOG.flush()
-
+def save(): json.dump(summary, open(os.path.join(OUT, "summary.json"), "w"), indent=1)
 def sh(cmd):
     log("$", cmd); r = subprocess.run(cmd, shell=True, capture_output=True, text=True); log((r.stdout + r.stderr)[-1500:]); return r.returncode
 
-sh("nvidia-smi --query-gpu=name,driver_version --format=csv || true")
 if not os.environ.get("SKIP_INSTALL"):
+    sh("nvidia-smi --query-gpu=name,driver_version --format=csv || true")
     sh(f"{sys.executable} -m pip install -q playwright==1.48.0")
     sh(f"{sys.executable} -m playwright install --with-deps chromium 2>&1 | tail -3")
 CHROME = os.environ.get("CHROME_PATH") or None
-sh("ls /usr/share/vulkan/icd.d /etc/vulkan/icd.d 2>/dev/null; vulkaninfo --summary 2>/dev/null | head -20 || true")
-
 from playwright.sync_api import sync_playwright
 
-COMMON = ["--enable-unsafe-webgpu", "--ignore-gpu-blocklist", "--enable-features=Vulkan,WebGPU", "--no-sandbox",
-          "--disable-vulkan-surface", "--enable-dawn-features=allow_unsafe_apis"]
+COMMON = ["--enable-unsafe-webgpu", "--ignore-gpu-blocklist", "--no-sandbox", "--enable-dawn-features=allow_unsafe_apis"]
 BACKENDS = {
-    "t4_vulkan": COMMON + ["--use-angle=vulkan", "--use-vulkan=native"],
-    "gpu_default": ["--enable-unsafe-webgpu", "--ignore-gpu-blocklist", "--no-sandbox", "--enable-features=Vulkan"],
-    "swiftshader": COMMON + ["--use-webgpu-adapter=swiftshader", "--use-angle=swiftshader", "--use-vulkan=swiftshader"],
+    "t4_vulkan": COMMON + ["--enable-features=Vulkan,WebGPU", "--use-angle=vulkan", "--use-vulkan=native", "--disable-vulkan-surface"],
+    "gpu_default": COMMON + ["--enable-features=Vulkan"],
+    "swiftshader": COMMON + ["--enable-features=Vulkan", "--use-webgpu-adapter=swiftshader", "--use-angle=swiftshader", "--use-vulkan=swiftshader"],
 }
-# Which lab steps per backend: SwiftShader is slow, so only the fingerprint there.
-STEPS = {"t4_vulkan": ["lab-fp", "lab-cap", "lab-rt"], "gpu_default": ["lab-fp", "lab-cap", "lab-rt"], "swiftshader": ["lab-fp"]}
-DONE = {"lab-fp": "Fingerprint recorded", "lab-cap": "Capacity from", "lab-rt": "of 4 decoded"}
+ADAPTER_JS = """async () => { const a = await navigator.gpu?.requestAdapter(); if (!a) return null;
+  const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : {}); return {vendor: i.vendor, architecture: i.architecture, description: i.description}; }"""
 
-summary = {}
+def run_task(p, name, js, cap_s):
+    """Start async JS in the page, wait up to cap_s, record result or TIMEOUT."""
+    cap_s = min(cap_s, DEADLINE - time.time())
+    if cap_s < 30: summary[name] = "SKIPPED (out of time)"; save(); return None
+    t0 = time.time()
+    p.evaluate(f"() => {{ window.__r = undefined; (async () => {{ {js} }})().then(r => window.__r = {{ok: r}}, e => window.__r = {{err: String(e && e.stack || e)}}); }}")
+    try:
+        p.wait_for_function("() => window.__r !== undefined", timeout=cap_s * 1000, polling=3000)
+        r = p.evaluate("() => window.__r")
+    except Exception:
+        r = {"err": f"TIMEOUT after {cap_s:.0f}s", "progress": p.evaluate("() => window.__progress || null")}
+    r["seconds"] = round(time.time() - t0)
+    summary[name] = r; save(); log(name, json.dumps(r)[:3000]); return r
+
 with sync_playwright() as pw:
+    adapters = {}
     for name, args in BACKENDS.items():
-        if name == "gpu_default" and "seconds" in summary.get("t4_vulkan", {}): continue
-        log("=== backend", name)
         try:
             b = pw.chromium.launch(headless=True, executable_path=CHROME, args=args + ["--headless=new"])
-            p = b.new_page()
-            p.on("console", lambda m: log("console:", m.text[:300]))
-            p.goto(URL, timeout=120000)
-            info = p.evaluate("""async () => { const a = await navigator.gpu?.requestAdapter(); if (!a) return null;
-              const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : {}); return {vendor: i.vendor, architecture: i.architecture, device: i.device, description: i.description, fallback: a.isFallbackAdapter}; }""")
-            log("adapter:", info)
-            if not info: summary[name] = {"error": "no WebGPU adapter"}; b.close(); continue
-            steps = STEPS[name]
-            if name == "swiftshader" and not any("seconds" in summary.get(n, {}) for n in ("t4_vulkan", "gpu_default")):
-                steps = ["lab-fp", "lab-rt", "lab-cap"]  # no real GPU: run everything on the CPU backend, most useful first
-            t0 = time.time()
-            p.click("#wake")
-            p.wait_for_function("() => /ready|Couldn't/.test(document.querySelector('#loadtxt').textContent)", timeout=3600_000, polling=2000)
-            log("load:", p.text_content("#loadtxt"), f"{time.time()-t0:.0f}s")
-            if "Couldn't" in p.text_content("#loadtxt"): summary[name] = {"error": p.text_content("#loadtxt"), "adapter": info}; b.close(); continue
-            p.click("[data-pane=lab]")
-            for step in steps:
-                t1 = time.time(); p.click("#" + step)
-                p.wait_for_function(f"() => /{DONE[step]}|Error/.test(document.querySelector('#labmeta').textContent)", timeout=4 * 3600_000, polling=5000)
-                log(step, p.text_content("#labmeta"), f"{time.time()-t1:.0f}s")
-                log(p.text_content("#labout")[:1500])
-                rep = p.evaluate("() => JSON.parse(JSON.stringify(window.stegoReport))")
-                json.dump(rep, open(os.path.join(OUT, f"report_{name}.json"), "w"))
-            summary[name] = {"adapter": info, "seconds": round(time.time() - t0)}
-            b.close()
+            p = b.new_page(); p.goto(URL, timeout=120000)
+            adapters[name] = p.evaluate(ADAPTER_JS); b.close()
         except Exception as e:
-            log("FAILED", name, traceback.format_exc()[-2000:]); summary[name] = {"error": str(e)[:500]}
+            adapters[name] = {"error": str(e)[:300]}
+        log("adapter", name, adapters[name])
+    summary["adapters"] = adapters; save()
+    real = [n for n in ("t4_vulkan", "gpu_default") if adapters.get(n) and "error" not in adapters[n] and adapters[n].get("architecture") != "swiftshader"]
+    pick = real[0] if real else ("swiftshader" if adapters.get("swiftshader") and "error" not in adapters["swiftshader"] else None)
+    summary["backend"] = pick; save()
+    if not pick: log("no usable WebGPU adapter"); sys.exit(0)
 
-# Cross-backend comparison, using the page's own compare function in a plain (no-GPU) page.
-reps = {n: json.load(open(os.path.join(OUT, f"report_{n}.json"))) for n in BACKENDS if os.path.exists(os.path.join(OUT, f"report_{n}.json"))}
-if len(reps) >= 2 and all("fingerprint" in r for r in reps.values()):
-    with sync_playwright() as pw:
-        b = pw.chromium.launch(headless=True, executable_path=CHROME, args=["--no-sandbox"]); p = b.new_page(); p.goto(URL)
-        a, c = list(reps.values())
-        summary["cross_backend"] = p.evaluate("""async ([a, c]) => { const L = await import('./stegolab.mjs'); const S = await import('./stego.mjs');
-            return L.compareFingerprints(a.fingerprint, c.fingerprint, S.DEFAULTS); }""", [a, c])
-        b.close()
-for n, r in reps.items():
-    summary.setdefault(n, {}).update({k: r.get(k) for k in ("sameDeviceRepeat", "prefillVsDecode")})
-    if r.get("capacity"): summary[n]["capacityTop5"] = r["capacity"][:5]
-    if r.get("roundTrips"): summary[n]["roundTrips"] = [{k: x.get(k) for k in ("secret", "correct", "reason", "tries", "tokens", "chars", "text")} for x in r["roundTrips"]]
-json.dump(summary, open(os.path.join(OUT, "summary.json"), "w"), indent=1)
-log(json.dumps(summary, indent=1)[:6000])
+    b = pw.chromium.launch(headless=True, executable_path=CHROME, args=BACKENDS[pick] + ["--headless=new"])
+    p = b.new_page(); p.on("pageerror", lambda e: log("pageerror:", str(e)[:300]))
+    p.goto(URL, timeout=120000)
+    t0 = time.time(); p.click("#wake")
+    try:
+        p.wait_for_function("() => /ready|Couldn't/.test(document.querySelector('#loadtxt').textContent)", timeout=1800_000, polling=3000)
+    except Exception: pass
+    summary["load"] = {"text": p.text_content("#loadtxt"), "seconds": round(time.time() - t0)}; save(); log("load", summary["load"])
+    if "ready" not in summary["load"]["text"]: sys.exit(0)
+
+    # Speed: 16 decode steps.
+    run_task(p, "speed", """const {lm, S} = window.stegoCtx(); let lg = await lm.begin(lm.promptIds(S.TOPICS[0])); const t = performance.now();
+      for (let i = 0; i < 16; i++) { window.__progress = i; lg = await lm.step(lm.encode(' the')[0]); } return {tokPerSec: 16000 / (performance.now() - t)};""", 900)
+    # Fingerprint + same-device repeat (the cross-device baseline).
+    run_task(p, "fingerprint", """const {lm, mask, P, L} = window.stegoCtx(); const a = await L.fingerprint(lm, mask); const b = await L.fingerprint(lm, mask);
+      window.stegoReport.fingerprint = a; return {repeat: L.compareFingerprints(a, b, P), fp: a};""", 1800)
+    # One real encode -> decode, generous length so we learn how many characters a secret needs.
+    rt_js = """const {lm, mask, P, S} = window.stegoCtx(); const p = {...P, maxChars: 3000, maxTokens: 260}; const out = [];
+      for (const [secret, topic] of SECRETS) { for (let seed = 1000; seed < 1000 + TRIES; seed++) {
+        const t0 = performance.now(); const e = await S.encodeOnce(lm, mask, secret, topic, p, seed, (ids) => { window.__progress = {secret, seed, tokens: ids.length}; });
+        const r = {secret, topic, seed, ok: e.ok, reason: e.reason || null, text: e.text, tokens: e.ids && e.ids.length, chars: e.text && e.text.length, st: e.st, encodeS: (performance.now() - t0) / 1000};
+        if (e.ok) { const t1 = performance.now(); const N = await S.readDigits(lm, mask, lm.encode(e.text), topic, p); r.decoded = S.unpackSecret(N); r.correct = r.decoded === S.normalizeSecret(secret); r.decodeS = (performance.now() - t1) / 1000; }
+        out.push(r); window.__partial = out; if (e.ok) break; } } return out;"""
+    gpu = pick != "swiftshader"
+    secrets = [["meet at 7", 0], ["bring snacks", 1], ["the code is 4417", 2], ["yes", 3]] if gpu else [["meet at 7", 0]]
+    r = run_task(p, "roundtrip", rt_js.replace("SECRETS", json.dumps(secrets)).replace("TRIES", "3" if gpu else "2"), 3600 if gpu else 5400)
+    if r and "err" in r: summary["roundtrip_partial"] = p.evaluate("() => window.__partial || null"); save()
+    if gpu:
+        run_task(p, "capacity", """const {lm, mask, L} = window.stegoCtx(); const nat = await L.sampleNatural(lm, mask, 6, 90, (s, i) => window.__progress = [s, i]);
+          return {top: L.capacity(nat).slice(0, 8), texts: nat.map(s => s.text)};""", 2400)
+    b.close()
+log("done", json.dumps(summary)[:4000])

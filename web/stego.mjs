@@ -152,6 +152,23 @@ function sample(top, temp, topP, rng) {
 
 const TOPW = 24;
 
+// Candidates for the next token after `prefix`: top allowed tokens, minus any that would merge with the
+// last few tokens when the text is re-tokenized (e.g. " walk" + "ing" -> " walking"). Picking such a token
+// would make the reader see different tokens. The check uses only token ids, so both sides agree.
+export function candidates(lm, mask, logits, prefix, n = TOPW) {
+  const raw = topN(logits, mask, n * 2), ids = [], vals = [];
+  const win = prefix.slice(-4);
+  for (let i = 0; i < raw.ids.length && ids.length < n; i++) {
+    const t = raw.ids[i];
+    if (t < 0) break;
+    let ok = false;
+    try { const want = [...win, t], got = lm.encode(lm.decode(want)); ok = got.length === want.length && got.every((x, j) => x === want[j]); } catch { /* not canonical */ }
+    if (ok) { ids.push(t); vals.push(raw.vals[i]); }
+  }
+  while (ids.length < n) { ids.push(-1); vals.push(-Infinity); }
+  return { ids, vals };
+}
+
 // lm: { vocabSize, encode(text) -> ids, decode(ids) -> text, async begin(promptIds) -> logits, async step(id) -> logits, promptIds(topic) -> ids }
 export async function encodeOnce(lm, mask, secret, topicIdx, p, seed, onStep) {
   let { N } = packSecret(secret);
@@ -161,7 +178,7 @@ export async function encodeOnce(lm, mask, secret, topicIdx, p, seed, onStep) {
   const st = { carry: 0, bits: 0, ambiguous: 0, free: 0, steps: 0 };
   let logits = await lm.begin(lm.promptIds(TOPICS[topicIdx]));
   for (let i = 0; i < p.maxTokens; i++) {
-    const top = topN(logits, mask, TOPW);
+    const top = candidates(lm, mask, logits, ids);
     const c = classify(top.vals, p, p.delta);
     let tok;
     if (c.ambiguous) {
@@ -203,7 +220,7 @@ export async function encodeSecret(lm, mask, secret, topicIdx, p = DEFAULTS, onT
 export async function readDigits(lm, mask, ids, topicIdx, p = DEFAULTS) {
   let N = 0n, M = 1n, logits = await lm.begin(lm.promptIds(TOPICS[topicIdx]));
   for (let i = 0; i < ids.length; i++) {
-    const top = topN(logits, mask, TOPW);
+    const top = candidates(lm, mask, logits, ids.slice(0, i));
     const c = classify(top.vals, p, 0);
     if (c.k > 0) {
       const set = carrySet(top.ids, c.k), d = set.indexOf(ids[i]);
