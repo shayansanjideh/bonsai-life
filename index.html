@@ -9,7 +9,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#9ec9ef;color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
-.hud{position:fixed;left:max(16px,env(safe-area-inset-left,0px));top:14px;display:flex;flex-direction:column;gap:8px;max-width:min(560px,calc(100vw - 460px))}
+.hud{z-index:2;position:fixed;left:max(16px,env(safe-area-inset-left,0px));top:14px;display:flex;flex-direction:column;gap:8px;max-width:min(560px,calc(100vw - 460px))}
 .title{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
 .title h1{margin:0;font-size:18px}
 .title p{margin:2px 0 0;color:var(--muted);font-size:12px}
@@ -24,7 +24,7 @@ button:hover{border-color:#47597a}
 button.primary{background:#1d3b2a;border-color:#2b6b45;color:var(--accent)}
 button:disabled{opacity:.6;cursor:default}
 button:focus-visible,input:focus-visible{outline:2px solid var(--pos);outline-offset:2px}
-.side{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:14px;bottom:14px;width:420px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.side{z-index:2;position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:14px;bottom:14px;width:420px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
 .tabs{display:flex;border-bottom:1px solid var(--line)}
 .tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 6px;color:var(--muted);font-weight:600}
 .tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
@@ -54,7 +54,7 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
 .veil h2{font-size:20px;color:var(--text);text-transform:none;letter-spacing:0}
 .veil p{color:var(--muted);max-width:460px;margin:0}
 .prog{width:min(360px,80%);height:6px;background:#1c2433;border-radius:99px;overflow:hidden} .prog>div{height:100%;width:0;background:var(--accent);transition:width .2s}
-.hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
+.hint{z-index:2;position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
 .label{position:fixed;pointer-events:none;transform:translate(-50%,-100%);text-align:center;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
 .label.sel{font-size:14px;color:var(--accent)}
 @media (max-width:900px){ .side{top:auto;height:46vh;width:auto;left:16px} .hud{max-width:calc(100vw - 32px)} .hint{display:none} }
@@ -67,13 +67,13 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
 <div class="hud">
   <div class="title"><h1>Bonsai Island</h1><p>Every creature has its own mind, all run by one Bonsai 2B (a 0.4 GB AI on your GPU, in this tab): each one decides who to court, follow, avoid or feed. Bodies are genes: babies mix their parents' bodies and mutate. Walk up to anyone and say hi.</p><p style="margin-top:4px;font-size:11px">Earlier experiments: <a href="generations.html" style="color:inherit">generations</a> · <a href="village.html" style="color:inherit">village</a> · <a href="secret.html" style="color:inherit">secret messages</a> · <a href="brain.html" style="color:inherit">brain explorer</a></p></div>
   <div class="row"><span id="status" class="status">Bonsai: loading…</span>
-    <button id="play" class="primary">Pause</button><button id="speed">Speed 1×</button><button id="feast">Grow food</button><button id="reset">New island</button></div>
+    <button id="view">View: first person</button><button id="play" class="primary">Pause</button><button id="speed">Speed 1×</button><button id="feast">Grow food</button><button id="reset">New island</button></div>
   <div class="chipbar"><span>Day <b id="kDay">1</b></span><span>Alive <b id="kPop">0</b></span><span>Generation <b id="kGen">0</b></span><span>Body types <b id="kTypes">0</b></span><span id="perf"></span></div>
 </div>
 <div class="side">
   <div class="tabs" role="tablist"><button role="tab" id="tab-who" aria-selected="true">Creature</button><button role="tab" id="tab-story" aria-selected="false">Story</button></div>
   <div class="pane" id="pane-who">
-    <div class="who"><div class="nm" id="wName">Click a creature</div><div class="sub" id="wSub">Drag to look around, scroll to zoom, WASD to move.</div></div>
+    <div class="who"><div class="nm" id="wName">Click a creature</div><div class="sub" id="wSub">Walk up to a creature, look at it and press E (or click it) to meet it.</div></div>
     <div class="pers" id="wPers"></div>
     <div><h2>Body (its genes)</h2><div class="chips" id="wGenes"></div><p class="small" id="wMut"></p></div>
     <div><div class="row" style="justify-content:space-between"><span class="small">Energy</span><span class="small" id="wEnergy"></span></div><div class="bar"><div id="wBar"></div></div></div>
@@ -83,12 +83,12 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
   </div>
   <div class="pane" id="pane-story" hidden><div class="feed" id="feed"></div></div>
 </div>
-<div class="hint">Drag to look · scroll to zoom · WASD to move · click a creature to follow and talk</div>
+<div class="hint" id="hint">Click the island to look around · WASD to walk · Shift to run · look at a creature and press E (or click) to talk · V switches first/third person · Esc frees the mouse</div>
+<div id="cross" style="position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid rgba(255,255,255,.85);border-radius:50%;pointer-events:none"></div>
 <div class="veil" id="veil"><h2 id="veilTitle">Waking Bonsai 2B…</h2><p id="veilText">Downloading the model into your browser (about 429 MB, once). After this it loads from cache in seconds.</p><div class="prog" id="veilProg"><div id="veilBar"></div></div></div>
 
 <script type="module">
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -100,7 +100,8 @@ const renderer = new THREE.WebGLRenderer({ canvas: $("c"), antialias: true });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.shadowMap.enabled = true;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9ec9ef); scene.fog = new THREE.Fog(0x9ec9ef, 70, 160);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400); camera.position.set(0, 24, 34);
-const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); controls.maxPolarAngle = 1.45; controls.minDistance = 6; controls.maxDistance = 120; controls.enableDamping = true;
+// the visitor: first person by default, third person shows a little explorer
+const me = { x: 0, z: 26, yaw: Math.PI, pitch: -0.12, view: "first" };
 scene.add(new THREE.HemisphereLight(0xdff1ff, 0x55704a, 1.1));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(30, 60, 20); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60 }); scene.add(sun);
@@ -384,17 +385,25 @@ $("play").onclick = () => { running = !running; $("play").textContent = running 
 $("speed").onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $("speed").textContent = `Speed ${speed}×`; };
 $("feast").onclick = () => { bushes.forEach(b => b.berries.forEach(m => m.visible = true)); for (let i = 0; i < 6; i++) addBush(); story("Berries burst out across the island.", "god"); };
 $("reset").onclick = () => founders();
-const keys = {}; addEventListener("keydown", e => keys[e.key.toLowerCase()] = true); addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
-const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let downAt = null;
-renderer.domElement.addEventListener("pointerdown", e => downAt = [e.clientX, e.clientY]);
-renderer.domElement.addEventListener("pointerup", e => {
-  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
-  mouse.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mouse, camera);
-  const hits = ray.intersectObjects(C.filter(c => c.alive).map(c => c.mesh), true);
-  if (hits.length) { let o = hits[0].object; const c = C.find(c => { let p = o; while (p) { if (p === c.mesh) return true; p = p.parent; } return false; }); if (c) { select(c); following = true; } }
-});
-let following = false;
-controls.addEventListener("start", () => { if (keys.w || keys.a || keys.s || keys.d) following = false; });
+const keys = {}; addEventListener("keydown", e => { if (e.target.tagName !== "INPUT") keys[e.key.toLowerCase()] = true; }); addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let dragging = null;
+const cvs = renderer.domElement, locked = () => document.pointerLockElement === cvs;
+function look(dx, dy) { me.yaw -= dx * 0.0025; me.pitch = clamp(me.pitch - dy * 0.0025, -1.2, 0.9); }
+cvs.addEventListener("mousedown", e => { dragging = [e.clientX, e.clientY, e.clientX, e.clientY]; if (!locked()) { try { const p = cvs.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch {} } else interact(); });
+addEventListener("mousemove", e => { if (locked()) look(e.movementX, e.movementY); else if (dragging && e.buttons) { look(e.clientX - dragging[2], e.clientY - dragging[3]); dragging[2] = e.clientX; dragging[3] = e.clientY; } });
+addEventListener("mouseup", e => { if (dragging && !locked() && Math.hypot(e.clientX - dragging[0], e.clientY - dragging[1]) < 5) { mouse.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); pickAt(mouse); } dragging = null; });
+addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; const k = e.key.toLowerCase(); if (k === "v") toggleView(); if (k === "e") interact(); });
+function creatureOf(o) { return C.find(c => { let p = o; while (p) { if (p === c.mesh) return true; p = p.parent; } return false; }); }
+function pickAt(v) { ray.setFromCamera(v, camera); const hits = ray.intersectObjects(C.filter(c => c.alive).map(c => c.mesh), true); const c = hits.length ? creatureOf(hits[0].object) : null; if (c && c.alive) { select(c); return c; } return null; }
+function interact() { const c = pickAt(new THREE.Vector2(0, 0)); if (c) { if (locked()) document.exitPointerLock(); setTimeout(() => $("say").focus(), 50); } }
+function toggleView() { me.view = me.view === "first" ? "third" : "first"; $("view").textContent = `View: ${me.view} person`; avatar.visible = me.view === "third"; }
+$("view").onclick = toggleView;
+// the explorer avatar (third person only)
+const avatar = new THREE.Group(); { const m = new THREE.MeshStandardMaterial({ color: 0xf2e6d0, flatShading: true }), d = new THREE.MeshStandardMaterial({ color: 0x3b4a66, flatShading: true });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 4, 8), d); body.position.y = 1.2; body.castShadow = true; avatar.add(body);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), m); head.position.y = 2.25; head.castShadow = true; avatar.add(head);
+  const hat = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x5dff96, flatShading: true })); hat.position.y = 2.75; avatar.add(hat);
+  avatar.visible = false; scene.add(avatar); }
 
 // labels over creatures
 const labelBox = $("labels"), labelEls = new Map(), v3 = new THREE.Vector3();
@@ -446,12 +455,17 @@ function frame(t) {
     m.userData.body.position.y = Math.abs(Math.cos(c.walk * 3)) * 0.08; m.userData.head.rotation.y = Math.sin(t / 900 + c.id) * 0.25;
   }
   for (const e of eggs) e.mesh.rotation.z = Math.sin(t / 150) * 0.12 * (performance.now() - e.t > 0 ? 1 : 0);
-  // camera: WASD moves the view; following keeps the selected creature in frame
-  camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.crossVectors(fwd, camera.up);
-  const mv = new THREE.Vector3(); if (keys.w) mv.add(fwd); if (keys.s) mv.sub(fwd); if (keys.d) mv.add(right); if (keys.a) mv.sub(right);
-  if (mv.lengthSq()) { following = false; mv.normalize().multiplyScalar(dt * 22); camera.position.add(mv); controls.target.add(mv); }
-  if (following && selected?.alive) { const tgt = new THREE.Vector3(selected.x, height(selected.x, selected.z) + 1.5, selected.z), d = tgt.clone().sub(controls.target).multiplyScalar(1 - Math.pow(0.02, dt)); controls.target.add(d); camera.position.add(d); }
-  controls.update(); if (!NORENDER) { renderer.render(scene, camera); updateLabels(); }
+  // the visitor walks on the terrain; the camera is its eyes (first person) or sits behind it (third person)
+  if (document.activeElement?.tagName !== "INPUT") {
+    const run = keys.shift ? 2 : 1, f = (keys.w ? 1 : 0) - (keys.s ? 1 : 0), r = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+    if (f || r) { const sp = 9 * run * dt / Math.hypot(f, r); me.x += (-Math.sin(me.yaw) * f - Math.cos(me.yaw) * r) * sp; me.z += (-Math.cos(me.yaw) * f + Math.sin(me.yaw) * r) * sp; const rr = Math.hypot(me.x, me.z); if (rr > WORLD + 4) { me.x *= (WORLD + 4) / rr; me.z *= (WORLD + 4) / rr; } }
+  }
+  const gy = Math.max(height(me.x, me.z), -1.8), dirv = new THREE.Vector3(-Math.sin(me.yaw) * Math.cos(me.pitch), Math.sin(me.pitch), -Math.cos(me.yaw) * Math.cos(me.pitch));
+  avatar.position.set(me.x, gy, me.z); avatar.rotation.y = me.yaw;
+  if (me.view === "first") { camera.position.set(me.x, gy + 2.6, me.z); camera.lookAt(camera.position.clone().add(dirv)); }
+  else { const back = dirv.clone().multiplyScalar(-9); camera.position.set(me.x + back.x, Math.max(gy + 1, gy + 3.2 + back.y), me.z + back.z); camera.lookAt(me.x, gy + 2, me.z); }
+  $("cross").style.display = me.view === "first" ? "block" : "none";
+  if (!NORENDER) { renderer.render(scene, camera); updateLabels(); }
   if (t - panelT > 400) {
     panelT = t; const L = C.filter(c => c.alive);
     $("kDay").textContent = Math.floor(day()) + 1; $("kPop").textContent = L.length + (eggs.length ? ` +${eggs.length} eggs` : "");
@@ -462,7 +476,7 @@ function frame(t) {
   }
   requestAnimationFrame(frame);
 }
-window.BI = { tick, get C() { return C; }, get stats() { return stats; }, select: n => { const c = C.find(c => c.name === n); if (c) { select(c); following = true; } }, talk, get started() { return started; } };
+window.BI = { tick, me, toggleView, get C() { return C; }, get stats() { return stats; }, select: n => { const c = C.find(c => c.name === n); if (c) select(c); }, talk, get started() { return started; } };
 requestAnimationFrame(frame);
 wake().then(ok => { founders(); if (model) mindLoop(); });
 </script>
