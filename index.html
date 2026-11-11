@@ -147,7 +147,7 @@ function childGenome(p, q) {
 }
 function describeMut(k, a, b) {
   const up = b > a;
-  return { legPairs: up ? "an extra pair of legs" : "one fewer pair of legs", eyes: up ? "an extra eye" : "one fewer eye", horns: up ? "an extra horn" : "lost a horn", segments: up ? "a longer, extra body segment" : "a shorter body", crest: up ? "a crest on its back" : "no crest", spots: up ? "spots" : "no spots", tail: up ? "a much longer tail" : "a stubby tail", size: up ? "a much bigger body" : "a much smaller body", legLen: up ? "much longer legs" : "much shorter legs", neck: up ? "a long neck" : "a short neck" }[k];
+  return { legPairs: up ? "an extra pair of legs" : "one fewer pair of legs", eyes: up ? "an extra eye" : "one fewer eye", horns: up ? "an extra horn" : "one fewer horn", segments: up ? "a longer, extra body segment" : "a shorter body", crest: up ? "a crest on its back" : "no crest", spots: up ? "spots" : "no spots", tail: up ? "a much longer tail" : "a stubby tail", size: up ? "a much bigger body" : "a much smaller body", legLen: up ? "much longer legs" : "much shorter legs", neck: up ? "a long neck" : "a short neck" }[k];
 }
 function bodyWords(g) {
   const sz = g.size > 1.3 ? "big" : g.size < 0.9 ? "small" : "medium", legs = g.legLen > 1.2 ? "long" : g.legLen < 0.8 ? "short" : "";
@@ -198,6 +198,8 @@ function spawn({ g, name, personality, gen = 0, parents = [], x, z, age = 0, mut
 }
 const ageOf = c => ((c.alive ? simT : c.diedAt) - c.born) / DAY;
 const adult = c => ageOf(c) >= 1;
+const ready = c => c.alive && adult(c) && c.energy > 0.55 && simT - c.mateT > DAY * 0.6 && ageOf(c) < 6.5;
+const related = (a, b) => a.parents.includes(b.name) || b.parents.includes(a.name) || (a.parents.length && a.parents.some(p => b.parents.includes(p)));
 function remember(c, s) { c.events.unshift(`${s} (day ${Math.floor(day()) + 1})`); if (c.events.length > 5) c.events.pop(); }
 function tick(dt) {
   simT += dt;
@@ -227,7 +229,8 @@ function tick(dt) {
       const sp = Math.max(0.6, c.t.speed) * (adult(c) ? 1 : 0.7) * (ageOf(c) > 6 ? 0.7 : 1); c.x += Math.sin(c.dir) * sp * dt; c.z += Math.cos(c.dir) * sp * dt; c.walk += dt * sp * 2.2; }
     else if (G.type === "eat") { const m = G.t.berries.find(m => m.visible); if (m) { m.visible = false; c.energy = Math.min(1, c.energy + 0.3); } c.think = 0; }
     else if (G.type === "mate" && G.t.alive) {
-      const mutual = !(G.t.plan?.action === "avoid" && G.t.plan.target === c.name);   // the courted one says no by choosing to avoid
+      const saidYes = G.t.plan?.action === "court" && G.t.plan.target === c.name && simT - G.t.plan.t < 40, saidNo = G.t.plan?.action === "avoid" && G.t.plan.target === c.name;
+      const mutual = c.plan?.instinct ? saidYes : !saidNo && !related(c, G.t);
       if (mutual && adult(c) && adult(G.t) && c.energy > 0.45 && G.t.energy > 0.45 && simT - G.t.mateT > DAY * 0.6 && simT - c.mateT > DAY * 0.6 && C.filter(o => o.alive).length + eggs.length < POP_MAX) { c.mateT = G.t.mateT = simT; c.energy -= 0.22; G.t.energy -= 0.22; layEgg(c, G.t); c.plan = G.t.plan = null; c.think = 0; }
       else if (!G.t.courtedBy || G.t.courtedBy.name !== c.name || simT - G.t.courtedBy.t > 15) { G.t.courtedBy = { name: c.name, t: simT }; wantTurn(G.t, `${c.name} came close and is courting you.`); }
     }
@@ -235,9 +238,18 @@ function tick(dt) {
     if (G.type === "rest") moving = false;
     const r = Math.hypot(c.x, c.z); if (r > WORLD) { c.x *= WORLD / r; c.z *= WORLD / r; }
     c.energy -= c.t.cost * (moving ? 1 : 0.45) * (adult(c) ? 1 : 0.7) * dt;
-    if (c.energy <= 0) die(c, "of hunger"); else if (ageOf(c) > 7 + (c.id % 5) * 0.4) die(c, "of old age");
+    if (c.energy <= 0) die(c, "of hunger"); else if (ageOf(c) > 9 + (c.id % 5) * 0.4) die(c, "of old age");
   }
   for (const e of eggs) if (!e.mesh.visible) continue;
+  if (started && live.length + eggs.length < POP_MAX) for (const a of live) {
+    if (!ready(a) || a.plan?.action === "court") continue;
+    const b = live.find(o => o !== a && ready(o) && !related(a, o) && Math.hypot(o.x - a.x, o.z - a.z) < 7 && simT - (a.proposed?.[o.name] ?? -99) > 25);
+    if (!b) continue;
+    (a.proposed ??= {})[b.name] = simT; a.plan = { action: "court", target: b.name, t: simT, instinct: true };
+    remember(b, `${a.name} asked to have a baby with me`);
+    wantTurn(b, `${a.name} is asking to have a baby with you. Choose "court ${a.name}" to say yes, or "avoid ${a.name}" to say no.`);
+    break;
+  }
   if (started && live.length + eggs.length < 3 && rnd() < dt * 0.05) wanderer();
 }
 function die(c, cause) {
@@ -278,7 +290,7 @@ Give the baby a short, cute, made-up name (one word, 2-3 syllables, not one of: 
 Reply with only JSON: {"name": "...", "personality": "..."}`, 70);
   const o = r && parseJSON(r.raw); if (!o) return null;
   let name = String(o.name || "").replace(/[^A-Za-z]/g, "").slice(0, 10); if (!name || C.some(c => c.name.toLowerCase() === name.toLowerCase())) name = fallbackName(); else name = name[0].toUpperCase() + name.slice(1).toLowerCase();
-  return { name, personality: String(o.personality || "").slice(0, 110) };
+  return { name, personality: String(o.personality || "").split(/\s+/).slice(0, 14).join(" ").replace(/[,;]$/, "") };
 }
 async function founders() {
   C.forEach(c => scene.remove(c.mesh)); C = []; eggs.forEach(e => scene.remove(e.mesh)); eggs = []; simT = 0; nextId = 1; $("feed").innerHTML = ""; started = false;
@@ -308,7 +320,7 @@ function mindPrompt(c, why, order) {
   const berries = bushes.filter(b => ripe(b) && Math.hypot(b.x - c.x, b.z - c.z) < c.t.sight).length;
   const who = near.length ? near.map(o => `- ${o.name}: ${bodyWords(o.g)}; "${o.personality}"; ${adult(o) ? "adult" : "baby"}, looks ${feelFood(o.energy)}${o.parents.includes(c.name) ? ", YOUR CHILD" : c.parents.includes(o.name) ? ", YOUR PARENT" : ""}${o.plan?.target === c.name ? `, wants to ${o.plan.action} you` : ""}`).join("\n") : "- nobody nearby";
   return `You are ${c.name}, a creature on a small island. Your body: ${bodyWords(c.g)}. Your personality: ${c.personality}.
-You are ${adult(c) ? "an adult" : "a baby"}, ${ageOf(c).toFixed(1)} days old (creatures live about 7 days). You feel ${feelFood(c.energy)}. ${berries ? `${berries} berry bushes in sight.` : "No berries in sight."} You have ${c.kids} children.${adult(c) && c.energy > 0.55 && simT - c.mateT > DAY * 0.6 ? " You feel ready to start a family, if you find someone you like." : ""}
+You are ${adult(c) ? "an adult" : "a baby"}, ${ageOf(c).toFixed(1)} days old (creatures live about 9 days). You feel ${feelFood(c.energy)}. ${berries ? `${berries} berry bushes in sight.` : "No berries in sight."} You have ${c.kids} children.${adult(c) && c.energy > 0.55 && simT - c.mateT > DAY * 0.6 ? " You feel ready to start a family, if you find someone you like." : ""}
 Creatures you can see:
 ${who}
 Recent memories: ${c.events.length ? c.events.join("; ") : "none"}.
@@ -348,7 +360,7 @@ async function talk(text) {
   const near = C.filter(o => o.alive && o !== c && Math.hypot(o.x - c.x, o.z - c.z) < 15).map(o => o.name);
   const sys = `You are ${c.name}, a small creature living on an island, talking with a giant visitor from outside the island. Stay in character.
 Your body: ${bodyWords(c.g)}. Your personality: ${c.personality}.
-Your life: ${ageOf(c).toFixed(1)} days old (creatures live about 7 days), generation ${c.gen}${c.parents.length ? `, child of ${c.parents.join(" and ")}` : ", one of the first creatures on the island"}, ${c.kids} children. You feel ${feelFood(c.energy)}. Your current plan: ${c.plan ? c.plan.action + (c.plan.target ? " " + c.plan.target : "") : "nothing yet"}.${near.length ? ` Nearby: ${near.join(", ")}.` : ""}
+Your life: ${ageOf(c).toFixed(1)} days old (creatures live about 9 days), generation ${c.gen}${c.parents.length ? `, child of ${c.parents.join(" and ")}` : ", one of the first creatures on the island"}, ${c.kids} children. You feel ${feelFood(c.energy)}. Your current plan: ${c.plan ? c.plan.action + (c.plan.target ? " " + c.plan.target : "") : "nothing yet"}.${near.length ? ` Nearby: ${near.join(", ")}.` : ""}
 Recent memories: ${c.events.length ? c.events.join("; ") : "nothing special"}.
 Answer the visitor's latest message directly, in 1-2 short sentences, using real details from your life. Never repeat something you already said.`;
   const msgs = [{ role: "system", content: sys }];
