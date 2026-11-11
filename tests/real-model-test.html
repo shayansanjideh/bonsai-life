@@ -1,0 +1,72 @@
+<!doctype html><meta charset="utf-8"><title>Brain explorer: real model test</title><pre id="o">starting</pre>
+<script type="module">
+// End-to-end check of brain-engine.mjs against the real Ternary-Bonsai-2-2B (downloads 429 MB from Hugging Face).
+// ?quick=1 skips the lesion scan (for slow software GPUs). Results go to window.result and the page text.
+import { loadRealEngine, softmaxTop, logProb, sample } from "../web/brain-engine.mjs";
+const q = new URLSearchParams(location.search), quick = q.has("quick");
+const R = { steps: [], checks: [] }, o = document.getElementById("o");
+const log = (k, v) => { R.steps.push([k, v]); o.textContent = R.steps.map(([a, b]) => `${a}: ${typeof b === "string" ? b : JSON.stringify(b)}`).join("\n"); console.log(k, v); };
+const check = (ok, name, detail) => { R.checks.push({ ok, name, detail }); log((ok ? "PASS " : "FAIL ") + name, detail ?? ""); };
+const REF = "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight.";
+try {
+  const a = await navigator.gpu.requestAdapter(); log("adapter", a.info ? `${a.info.vendor} ${a.info.architecture} ${a.info.description}` : "?");
+  log("features", [...a.features].join(","));
+  const t0 = performance.now();
+  const eng = await loadRealEngine({ onStatus: m => log("load", m) });
+  log("loaded in", `${((performance.now() - t0) / 1000).toFixed(1)} s, format ${eng.surgeon.format}, ${eng.surgeon.tensors.length} ternary tensors, ${(eng.surgeon.totalWeights / 1e9).toFixed(3)}B weights, ${eng.layers.length} layers (${eng.layers.filter(l => l.type === "full").length} full attention)`);
+  check(eng.surgeon.tensors.length >= eng.layers.length * 6, "found ternary tensors in every layer", eng.surgeon.tensors.length);
+
+  async function greedy(prompt, n, chat = true) {
+    let logits = await eng.start(eng.encodePrompt(prompt, chat)); const ids = [], tops = []; const t = performance.now();
+    for (let i = 0; i < n; i++) { const id = sample(logits, 0); tops.push(softmaxTop(logits, 5, 1).top.map(c => [eng.piece(c.id), +c.p.toFixed(3)])); ids.push(id); if (eng.stopIds.has(id)) break; logits = await eng.step(id); }
+    return { text: eng.decode(ids), tps: ids.length / ((performance.now() - t) / 1000), tops };
+  }
+  async function refLoss() { const ids = eng.encodePrompt(REF, false); let lg = await eng.start(ids.slice(0, 1)), nll = 0;
+    for (let i = 1; i < ids.length; i++) { nll -= logProb(lg, ids[i]); if (i < ids.length - 1) lg = await eng.step(ids[i]); } return nll / (ids.length - 1); }
+  async function firstLogits() { return eng.start(eng.encodePrompt("The capital of France is", false)); }
+
+  const g0 = await greedy("What is the capital of France? Answer in one sentence.", 24);
+  log("intact answer", g0.text); log("speed", `${g0.tps.toFixed(2)} tok/s (incl. full-vocab readback)`); log("top5 at step 1", g0.tops[0]);
+  check(/paris/i.test(g0.text), "intact model answers Paris", g0.text);
+  const base = await firstLogits();
+  const L0 = await refLoss(); log("intact ref loss", L0.toFixed(4));
+  check(L0 > 0 && L0 < 4, "intact reference loss is sane", L0);
+
+  await eng.surgeon.init();
+  const after0 = await firstLogits(); let same = after0.every((v, i) => v === base[i]);
+  check(same, "taking the backup changes nothing", same);
+
+  const mid = Math.floor(eng.layers.length / 2);
+  for (const k of [`L${mid}.mlp`, `L${mid}.mixer`, "L0.mlp"]) {
+    await eng.surgeon.apply({ knock: new Set([k]) }); const L = await refLoss(); const g = await greedy("What is the capital of France? Answer in one sentence.", 24);
+    log(`knock ${k}`, `loss ${L.toFixed(4)} (+${(L - L0).toFixed(4)}) | ${g.text}`);
+    check(L !== L0, `knocking out ${k} changes the model`, L - L0);
+  }
+  for (const p of [0.05, 0.2, 0.5]) {
+    await eng.surgeon.apply({ random: p, seed: 1 }); const L = await refLoss(); const g = await greedy("Once upon a time", 20, false);
+    log(`random ${p * 100}%`, `loss ${L.toFixed(4)} | ${g.text}`);
+    R[`rand${p}`] = L;
+  }
+  check(R.rand0_5 > R.rand0_05, "more damage, higher loss", [R.rand0_05, R.rand0_2, R.rand0_5]);
+  await eng.surgeon.apply({ random: 0.2, seed: 1, mode: "flip" }); log("flip 20%", (await refLoss()).toFixed(4));
+
+  await eng.surgeon.restore();
+  const back = await firstLogits(); same = back.every((v, i) => v === base[i]);
+  let maxd = 0; for (let i = 0; i < base.length; i++) maxd = Math.max(maxd, Math.abs(back[i] - base[i]));
+  check(same, "restore gives bit-identical logits", `max |diff| ${maxd}`);
+  const L0b = await refLoss(); check(L0b === L0, "restore gives identical reference loss", [L0, L0b]);
+
+  if (!quick) {
+    const t1 = performance.now(), scan = [];
+    for (const l of eng.layers) for (const part of ["mixer", "mlp"]) {
+      await eng.surgeon.apply({ knock: new Set([`L${l.i}.${part}`]) }); scan.push({ layer: l.i, type: l.type, part, delta: +((await refLoss()) - L0).toFixed(4) });
+    }
+    await eng.surgeon.restore();
+    R.scan = scan; log("lesion scan", `${((performance.now() - t1) / 1000).toFixed(0)} s`);
+    log("top 8 most critical", [...scan].sort((a, b) => b.delta - a.delta).slice(0, 8).map(s => `L${s.layer} ${s.part}${s.part === "mixer" ? "(" + s.type + ")" : ""} +${s.delta}`));
+    log("least critical", [...scan].sort((a, b) => a.delta - b.delta).slice(0, 5).map(s => `L${s.layer} ${s.part} ${s.delta}`));
+  }
+  R.done = true; R.failed = R.checks.some(c => !c.ok);
+} catch (e) { log("ERROR", String(e?.stack || e)); R.error = String(e?.stack || e); R.done = true; R.failed = true; }
+window.result = R;
+</script>
