@@ -19,6 +19,7 @@ export function makeLM(noise = 0, noiseSeed = 7) {
   };
   return {
     vocabSize: V,
+    fpText: "the coffee was good today. i took a long walk in the rain and read my new book on the train home.",
     decode: ids => ids.map(i => PIECES[i]).join(""),
     encode(text) { // greedy longest match
       const out = []; let i = 0;
