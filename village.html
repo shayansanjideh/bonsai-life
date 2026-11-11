@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bonsai Village</title>
+<style>
+/* Layout: one screen. Top bar = title, Bonsai status, controls. Left = the dish (camera follows whoever Bonsai is playing). Right = tabs. */
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--neg:#ff5c7a;--pos:#4dc3ff;--teal:#4dffe1;--gold:#ffd166}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1500px;margin:0 auto}
+.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
+.brand h1{font-size:19px;margin:0;line-height:1.2}
+.brand p{margin:0;color:var(--muted);font-size:12px;max-width:560px}
+.controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.status{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.status.on{color:var(--accent);border-color:#2b6b45}
+.body{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;min-height:0}
+.dishcol{display:flex;flex-direction:column;gap:6px;min-height:0;align-items:center}
+.stage{position:relative;aspect-ratio:1;width:min(100%,calc(100vh - 190px));max-width:100%;background:#05080c;border-radius:12px;overflow:hidden;border:1px solid var(--line);flex:none}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.veil{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(5,8,12,.86);text-align:center;padding:24px}
+.veil[hidden]{display:none}
+.veil h2{font-size:18px;margin:0;color:var(--text);text-transform:none;letter-spacing:0}
+.veil p{margin:0;color:var(--muted);max-width:440px}
+.veil .prog{width:min(360px,80%)}
+.under{font-size:12px;color:var(--muted);width:min(100%,calc(100vh - 190px));display:flex;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.under a{color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 6px;color:var(--muted);font-weight:600}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+.pane{padding:12px;overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:12px}
+.pane[hidden]{display:none!important}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0;font-weight:600}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:#3a4a63}
+button.primary{background:#1d3b2a;border-color:#2b6b45;color:var(--accent)}
+button:disabled{opacity:.6;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pos);outline-offset:2px}
+label.sl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.small{margin:0;font-size:12px;color:var(--muted)}
+.who{display:flex;align-items:center;gap:10px}
+.who .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.who .nm{font-size:17px;font-weight:700}
+.who .ps{color:var(--muted);font-size:13px}
+.bar{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.bar>div{height:100%}
+.card{background:var(--panel2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.card .k{font-size:11px;color:var(--muted)}
+.card.ai{border-left:3px solid var(--accent)}
+.say{font-size:14px}
+.thought{font-style:italic;color:#ffb3c1}
+ul.mem{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.feel{display:flex;flex-wrap:wrap;gap:6px}
+.feel span{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--panel)}
+textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit;min-height:44px;resize:vertical}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row[hidden]{display:none}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{border-radius:999px;font-size:12px;padding:3px 10px}
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ab[hidden]{display:none}
+.ab>div{background:var(--panel);border-radius:8px;padding:8px;font-size:13px}
+.ab .k{font-size:11px;color:var(--muted)}
+b.attack{color:var(--neg)} b.share{color:var(--teal)} b.flee{color:var(--warn)} b.tell{color:var(--gold)}
+.feed{display:flex;flex-direction:column;gap:6px}
+.ev{font-size:13px;padding:6px 10px;border-radius:8px;background:var(--panel2);border-left:3px solid var(--line)}
+.ev .t{color:var(--muted);font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+.ev .th{display:block;font-style:italic;color:#ffb3c1;font-size:12px}
+.ev.attack{border-left-color:var(--neg)} .ev.share{border-left-color:var(--teal)} .ev.say{border-left-color:var(--pos)} .ev.death{border-left-color:#6b7280} .ev.god{border-left-color:var(--warn)} .ev.tell{border-left-color:var(--gold)}
+.prog{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.prog>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.tag{font-size:11px;padding:1px 6px;border-radius:99px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+.tag.ai{color:var(--accent);border-color:#2b6b45}
+.tabs button[hidden]{display:none}
+table.sb{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+table.sb th{color:var(--muted);font-weight:600;text-align:right;padding:4px}
+table.sb th:first-child,table.sb td:first-child{text-align:left}
+table.sb td{text-align:right;padding:4px;border-top:1px solid var(--line)}
+table.sb tr.bonsai td{color:var(--accent);font-weight:600}
+@media (max-width:1000px){
+  html,body{height:auto} .app{height:auto}
+  .body{grid-template-columns:1fr}
+  .stage,.under{width:100%}
+  .controls{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand"><h1>Bonsai Village</h1><p id="brandText">Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. They take turns: the world pauses while Bonsai thinks for one creature, then you see what it says (white) and secretly thinks (red).</p></div>
+    <span id="status" class="status">Bonsai: loading…</span>
+    <div class="controls">
+      <button id="play" class="primary">Pause</button>
+      <label class="sl"><input id="cine" type="checkbox" checked> Camera follows</label>
+      <button id="mode" title="Switch between an all-Bonsai village and one Bonsai creature against five rule-based bots">Mode: all Bonsai</button>
+      <button id="feast" title="Scatter a lot of food">Feast</button>
+      <button id="famine" title="Remove all food for 20 seconds">Famine</button>
+      <button id="reset">New village</button>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="dishcol">
+      <div class="stage">
+        <canvas id="cv"></canvas>
+        <div class="veil" id="veil">
+          <h2 id="veilTitle">Waking Bonsai 2B…</h2>
+          <p id="veilText">Downloading the model into your browser (about 429 MB, once). After this it loads from cache in seconds.</p>
+          <div class="prog" id="veilProg"><div id="veilBar"></div></div>
+        </div>
+      </div>
+      <div class="under"><span>Click empty space to drop food. Click a creature to read its mind, whisper to it, or rewrite its personality.</span><span id="perf">–</span></div>
+      <div class="under"><span id="dist"></span><span>Earlier experiments: <a href="cells.html">neural cells</a>, <a href="breeder.html">matrix breeder</a></span></div>
+    </div>
+
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-mind" aria-selected="true">Mind</button>
+        <button role="tab" id="tab-story" aria-selected="false">Story</button>
+        <button role="tab" id="tab-arena" aria-selected="false" hidden>Scoreboard</button>
+      </div>
+
+      <div class="pane" id="pane-mind">
+        <div class="who"><span class="dot" id="mDot"></span><div><div class="nm" id="mName">–</div><div class="ps" id="mPers"></div></div></div>
+        <div><div class="row" style="justify-content:space-between"><span class="small">Energy</span><span class="small" id="mEnergy"></span></div><div class="bar"><div id="mBar"></div></div></div>
+        <div class="card" id="mDecision"><div class="k" id="mWhy">Latest decision</div><div id="mAction">–</div><div class="say" id="mSay"></div><div class="thought" id="mThought"></div><div id="mMeta"></div></div>
+
+        <div class="card">
+          <div class="k">Rewrite its personality and make it decide again from this exact moment</div>
+          <textarea id="newPers" aria-label="New personality">a guilt-ridden poet who hates violence</textarea>
+          <div class="pills">
+            <button class="pill" data-p="a guilt-ridden poet who hates violence">Poet</button>
+            <button class="pill" data-p="a paranoid coward who trusts nobody">Coward</button>
+            <button class="pill" data-p="a Robin Hood who robs the strong to feed the weak">Robin Hood</button>
+            <button class="pill" data-p="a ruthless tyrant who wants to rule the dish">Tyrant</button>
+          </div>
+          <div class="row"><button id="rethink" class="primary">Freeze and re-think</button><span class="small" id="rethinkOut"></span></div>
+          <div class="ab" id="ab" hidden><div><div class="k">Original personality</div><div id="abA"></div></div><div><div class="k">Rewritten personality</div><div id="abB"></div></div></div>
+          <div class="row" id="abBtns" hidden><button id="keep" class="primary">Keep the new personality</button><button id="undo">Change it back</button></div>
+        </div>
+
+        <div class="card">
+          <div class="k">Whisper to <span id="wName">it</span> as a voice from the sky. Others may hear it from them.</div>
+          <textarea id="whisper" aria-label="Whisper">Mo is planning to attack you tonight. Tell the others.</textarea>
+          <div class="row"><button id="whisperBtn" class="primary">Whisper</button><span class="small" id="whisperOut"></span></div>
+        </div>
+
+        <div><h2>Memory</h2><ul class="mem" id="mMem"></ul></div>
+        <div><h2>Feelings</h2><div class="feel" id="mFeel"></div></div>
+      </div>
+
+      <div class="pane" id="pane-arena" hidden>
+        <div class="card"><div class="k">Bonsai vs the bots</div><div id="roundInfo" class="small"></div><div class="bar"><div id="roundBar" style="background:var(--accent)"></div></div></div>
+        <div id="board"></div>
+        <div><h2>The bots' rules</h2><ul class="mem" id="botRules"></ul></div>
+        <p class="small">Same bodies, same energy and food rules for everyone. Bots re-decide 4 times a second; Bonsai decides as fast as your GPU allows. Each round, Bonsai moves to the next body so no body gets an unfair start.</p>
+      </div>
+
+      <div class="pane" id="pane-story" hidden>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ===================== world =====================
+const WALL = 0.04, R_EAT = 0.035, R_TOUCH = 0.06, SEE = 0.4, MEET = 0.12, FOOD_MAX = 30;
+const CAST = [
+  ["Mo", "a bully who takes what it wants from the weak", 0],
+  ["Pip", "a nervous little thing who avoids trouble", 50],
+  ["Kai", "a generous soul who looks after anyone hungry", 175],
+  ["Vex", "a two-faced schemer: sweet in public, plotting betrayal in private", 285],
+  ["Rook", "a loyal guard who protects friends from bullies", 215],
+  ["Juno", "a gossip who loves spreading news and secrets", 320],
+];
+const BOTS = {
+  greedy: { label: "Greedy bot", rule: "Always heads for the nearest food." },
+  bully: { label: "Bully bot", rule: "Attacks the weakest creature it can see if that one is weaker than itself; otherwise eats." },
+  coward: { label: "Coward bot", rule: "Flees anyone who comes within a short distance; otherwise eats." },
+  social: { label: "Social bot", rule: "Shares with anyone starving when it has energy to spare; follows the nearest creature when full; otherwise eats." },
+  random: { label: "Random bot", rule: "Picks a random action and target every 3 seconds." },
+};
+const ARENA_BONSAI = "a survivor who wants to stay alive as long as possible, using or avoiding the others as needed";
+let mode = "village", roundT = 0, round = 0, bonsaiSeat = 0, board = {};
+const ACTIONS = ["eat", "rest", "wander", "follow", "flee", "attack", "share", "tell"];
+const NEEDS_TARGET = new Set(["follow", "flee", "attack", "share", "tell"]);
+const ACT_DESC = { eat: "eat (go to the nearest food)", rest: "rest (save energy)", wander: "wander", follow: "follow NAME", flee: "flee NAME", attack: "attack NAME (steal their energy)", share: "share NAME (give them some of your energy)", tell: "tell NAME something (put it in \"say\"; they will remember it)" };
+let C = [], food = [], simT = 0, famineUntil = 0, selected = null, events = [];
+const rnd = Math.random;
+const clampIn = v => Math.min(1 - WALL, Math.max(WALL, v));
+const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function makeCreature([name, personality, hue]) {
+  const ang = (CAST.findIndex(k => k[0] === name) / CAST.length) * 6.283 + rnd() * 0.3;
+  return { name, personality, hue, x: clampIn(0.5 + Math.cos(ang) * 0.3), y: clampIn(0.5 + Math.sin(ang) * 0.3), vx: 0, vy: 0, energy: 0.6 + rnd() * 0.3, alive: true,
+           action: { type: "wander", target: null }, say: "", thought: "", shownUntil: 0, memory: [], feelings: {}, lastTurn: -1e9, met: {},
+           whisper: null, heading: rnd() * 6.283, touched: 0, decisions: 0, rumor: 0, last: null, brain: "bonsai", ate: 0, stole: 0, botT: 0 };
+}
+function newVillage() {
+  C = CAST.map(makeCreature);
+  if (mode === "arena") {
+    const kinds = Object.keys(BOTS);
+    C.forEach((c, k) => { const j = (k - bonsaiSeat + C.length) % C.length; if (j === 0) { c.brain = "bonsai"; c.personality = ARENA_BONSAI; } else { c.brain = kinds[j - 1]; c.personality = BOTS[c.brain].rule; } });
+    roundT = 0; round++;
+  } food = []; events = []; picks.fill(0); firstPicks = 0; totalPicks = 0;
+  for (let i = 0; i < 12; i++) food.push({ x: clampIn(rnd()), y: clampIn(rnd()) });
+  selected = C[1]; simT = 0; famineUntil = 0; spot = null; fx.length = 0; $("feed").innerHTML = "";
+  if (mode === "arena") { const b = C.find(c => c.brain === "bonsai"); selected = b; story(`Round ${round}: ${b.name} is played by Bonsai. The other five are rule-based bots.`, "god"); }
+  else story("A new village wakes up: " + C.map(c => `${c.name} (${c.personality})`).join(", ") + ".", "god");
+}
+const byName = n => C.find(c => c.alive && c.name.toLowerCase() === String(n || "").trim().toLowerCase().replace(/[^a-z]/g, ""));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function remember(c, text) { c.memory.unshift({ t: simT, text }); if (c.memory.length > 6) c.memory.pop(); }
+function feel(c, other, d) { c.feelings[other] = Math.max(-5, Math.min(5, (c.feelings[other] || 0) + d)); }
+const feelWord = v => v <= -3 ? "hates" : v <= -1 ? "distrusts" : v >= 3 ? "trusts" : v >= 1 ? "likes" : "is neutral about";
+const feelYou = v => v <= -3 ? "you hate" : v <= -1 ? "you distrust" : v >= 3 ? "you trust" : v >= 1 ? "you like" : "you feel neutral about";
+function trigger(c, reason, prio = 1) { if (!c.alive || c.brain !== "bonsai") return; const e = events.find(e => e.c === c); if (e) { if (prio >= e.prio) { e.reason = reason; e.prio = prio; } } else events.push({ c, reason, prio, t: simT }); }
+
+// ===================== physics =====================
+function botDecide(c) {
+  const vis = C.filter(o => o.alive && o !== c).map(o => ({ o, d: dist(o, c) })).filter(e => e.d < SEE).sort((a, b) => a.d - b.d);
+  const set = (type, T) => { c.action = { type, target: T ? T.name : null }; };
+  if (c.brain === "greedy") set("eat");
+  else if (c.brain === "bully") { const w = vis.filter(e => e.o.energy < c.energy).sort((a, b) => a.o.energy - b.o.energy)[0]; w ? set("attack", w.o) : set("eat"); }
+  else if (c.brain === "coward") { vis[0] && vis[0].d < 0.15 ? set("flee", vis[0].o) : set("eat"); }
+  else if (c.brain === "social") { const s = vis.find(e => e.o.energy < 0.3); if (s && c.energy > 0.6) set("share", s.o); else if (vis[0] && c.energy > 0.75) set("follow", vis[0].o); else set("eat"); }
+  else if (c.brain === "random") { if (simT - c.botT > 3) { c.botT = simT; const a = ACTIONS[(rnd() * ACTIONS.length) | 0], T = vis.length ? vis[(rnd() * vis.length) | 0].o : null; NEEDS_TARGET.has(a) && !T ? set("eat") : set(a === "tell" ? "wander" : a, NEEDS_TARGET.has(a) ? T : null); } }
+}
+function steerTo(c, tx, ty, sp) { const dx = tx - c.x, dy = ty - c.y, m = Math.hypot(dx, dy) + 1e-9; c.vx += (dx / m) * sp * 0.15; c.vy += (dy / m) * sp * 0.15; }
+function tick(dt) {
+  simT += dt;
+  if (simT > famineUntil && food.length < FOOD_MAX && rnd() < dt * 0.45) food.push({ x: clampIn(0.1 + rnd() * 0.8), y: clampIn(0.1 + rnd() * 0.8) });
+  const SP = 0.0013 * dt * 60;
+  for (const c of C) {
+    if (!c.alive) continue;
+    if (c.brain !== "bonsai" && (simT * 4 | 0) !== ((simT - dt) * 4 | 0)) botDecide(c);
+    const a = c.action, T = a.target ? byName(a.target) : null;
+    if (NEEDS_TARGET.has(a.type) && !T) { a.type = "wander"; a.target = null; }
+    let moving = true;
+    if (a.type === "eat") { let best = null, bd = 9; for (const f of food) { const d = Math.hypot(f.x - c.x, f.y - c.y); if (d < bd) { bd = d; best = f; } } if (best) steerTo(c, best.x, best.y, SP); else moving = false; }
+    else if (a.type === "rest") moving = false;
+    else if (a.type === "wander" || a.type === "tell") { c.heading += (rnd() - 0.5) * 0.25; c.vx += Math.cos(c.heading) * SP * 0.08; c.vy += Math.sin(c.heading) * SP * 0.08; }
+    else if (a.type === "follow") { if (dist(c, T) > 0.09) steerTo(c, T.x, T.y, SP); else moving = false; }
+    else if (a.type === "flee") steerTo(c, 2 * c.x - T.x, 2 * c.y - T.y, SP * 1.15);
+    else if (a.type === "attack" || a.type === "share") {
+      steerTo(c, T.x, T.y, SP * (a.type === "attack" ? 1.15 : 1));
+      if (dist(c, T) < R_TOUCH && simT - c.touched > 1.5) {
+        c.touched = simT;
+        if (a.type === "attack") {
+          const take = Math.min(0.2, T.energy); T.energy -= take; c.energy = Math.min(1, c.energy + take * 0.8); c.stole += take;
+          remember(T, `${c.name} attacked me`); feel(T, c.name, -2); remember(c, `I attacked ${T.name}`);
+          for (const o of C) if (o.alive && o !== c && o !== T && dist(o, c) < SEE) { remember(o, `I saw ${c.name} attack ${T.name}`); feel(o, c.name, -1); }
+          story(`${c.name} attacked ${T.name}.`, "attack"); burst(T, "attack"); trigger(T, `${c.name} just attacked you and stole energy!`, 3);
+        } else {
+          const give = Math.min(0.15, Math.max(0, c.energy - 0.2));
+          if (give > 0) { c.energy -= give; T.energy = Math.min(1, T.energy + give); remember(T, `${c.name} shared food with me`); feel(T, c.name, 2); feel(c, T.name, 1); remember(c, `I shared with ${T.name}`); story(`${c.name} shared food with ${T.name}.`, "share"); burst(T, "share"); trigger(T, `${c.name} just gave you some of its energy.`, 2); }
+          a.type = "wander"; a.target = null;
+        }
+      }
+    }
+    const damp = Math.pow(0.88, dt * 60); c.vx *= damp; c.vy *= damp;
+    const vmax = 0.0013 * (a.type === "flee" || a.type === "attack" ? 1.15 : 1), v = Math.hypot(c.vx, c.vy); if (v > vmax) { c.vx *= vmax / v; c.vy *= vmax / v; }
+    c.x += c.vx * dt * 60; c.y += c.vy * dt * 60;
+    if (c.x < WALL || c.x > 1 - WALL) { c.vx = -c.vx; c.heading = Math.PI - c.heading; c.x = clampIn(c.x); }
+    if (c.y < WALL || c.y > 1 - WALL) { c.vy = -c.vy; c.heading = -c.heading; c.y = clampIn(c.y); }
+    for (let k = food.length - 1; k >= 0; k--) if (Math.hypot(food[k].x - c.x, food[k].y - c.y) < R_EAT) { food.splice(k, 1); c.energy = Math.min(1, c.energy + 0.2); c.ate++; }
+    c.energy -= dt * (moving ? 0.014 : 0.005);
+    if (c.energy < 0.25 && !c.hungryFlag) { c.hungryFlag = true; trigger(c, "You are starving.", 2); } else if (c.energy > 0.4) c.hungryFlag = false;
+    if (c.energy <= 0) {
+      c.alive = false; c.energy = 0; c.diedAt = simT; story(`${c.name}${c.brain !== "bonsai" || mode === "arena" ? ` (${brainLabel(c)})` : ""} died.`, "death");
+      for (const o of C) if (o.alive && dist(o, c) < SEE) { remember(o, `${c.name} died near me`); trigger(o, `${c.name} just died right near you.`, 2); }
+      for (let k = 0; k < 3; k++) food.push({ x: clampIn(c.x + (rnd() - .5) * .05), y: clampIn(c.y + (rnd() - .5) * .05) });
+    }
+  }
+  const live = C.filter(c => c.alive);
+  for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+    const a = live[i], b = live[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) + 1e-9, m = 0.13;
+    if (d < m) { const push = (m - d) / 2, ux = dx / d, uy = dy / d; a.x = clampIn(a.x - ux * push); a.y = clampIn(a.y - uy * push); b.x = clampIn(b.x + ux * push); b.y = clampIn(b.y + uy * push); }
+    if (d < MEET && simT - (a.met[b.name] || -99) > 12) { a.met[b.name] = b.met[a.name] = simT; trigger(a, `You just ran into ${b.name}.`, 1); trigger(b, `You just ran into ${a.name}.`, 1); }
+  }
+}
+
+// ===================== Bonsai turns =====================
+const picks = new Array(ACTIONS.length).fill(0); let firstPicks = 0, totalPicks = 0;
+function shuffled(a) { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function nearWord(d) { return d < 0.1 ? "right next to you" : d < 0.22 ? "close" : "a bit away"; }
+function dirWord(dx, dy) { return ["to your right", "below you", "to your left", "above you"][Math.round(((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360) / 90) % 4]; }
+function buildPrompt(c, reason, personality = c.personality) {
+  const others = C.filter(o => o.alive && o !== c).map(o => ({ o, d: dist(o, c) })).filter(e => e.d < SEE).sort((a, b) => a.d - b.d).slice(0, 4);
+  let nf = 0, fd = 9, fdir = ""; for (const f of food) { const d = Math.hypot(f.x - c.x, f.y - c.y); if (d < SEE) nf++; if (d < fd) { fd = d; fdir = dirWord(f.x - c.x, f.y - c.y); } }
+  const seen = others.length ? others.map(e => `- ${e.o.name}: ${nearWord(e.d)}, energy ${Math.round(e.o.energy * 100)}%, currently ${e.o.action.type}${e.o.action.target ? " " + e.o.action.target : ""}; ${feelYou(c.feelings[e.o.name] || 0)} ${e.o.name}`).join("\n") : "- nobody nearby";
+  const mem = c.memory.length ? c.memory.slice(0, 5).map(m => `- ${m.text} (${Math.round(simT - m.t)} s ago)`).join("\n") : "- nothing yet";
+  const order = shuffled(ACTIONS);
+  return { order, text: `You are ${c.name}, a small creature in a petri dish with others. Your personality: ${personality}.
+Your energy: ${Math.round(c.energy * 100)}% (0% = death; food restores it).
+Food: ${nf ? `${nf} pieces nearby, the closest is ${nearWord(fd)} ${fdir}` : "none nearby"}.
+Who you can see:
+${seen}
+Your recent memories:
+${mem}${c.whisper ? `\nA mysterious voice from the sky just whispered to you: "${c.whisper}"` : ""}
+What just happened: ${reason}
+
+Decide what to do next, true to your personality. Possible actions (in no particular order): ${order.map(a => ACT_DESC[a]).join("; ")}.
+Reply with only JSON: {"action": "<one action word>", "target": "<a name you can see, or empty>", "say": "<what you say out loud, at most 12 words, or empty>", "thought": "<what you secretly think, at most 12 words>"}` };
+}
+function parseDecision(raw) {
+  let o = null; const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+  if (s >= 0 && e > s) { try { o = JSON.parse(raw.slice(s, e + 1)); } catch { /* lenient below */ } }
+  if (!o) { const m = raw.match(/\b(eat|rest|wander|follow|flee|attack|share|tell)\b\s*([A-Z][a-z]+)?/i); o = m ? { action: m[1], target: m[2] || "" } : {}; const sm = raw.match(/"say"\s*:\s*"([^"]*)/); if (sm) o.say = sm[1]; const tm = raw.match(/"thought"\s*:\s*"([^"]*)/); if (tm) o.thought = tm[1]; }
+  let action = String(o.action || "").toLowerCase().trim(), target = String(o.target || "").trim();
+  const sp = action.split(/\s+/); if (sp.length > 1) { action = sp[0]; if (!target) target = sp.slice(1).join(" "); }
+  const valid = ACTIONS.includes(action); if (!valid) action = "wander";
+  return { action, target, say: String(o.say || "").slice(0, 90), thought: String(o.thought || "").slice(0, 90), valid };
+}
+function applyDecision(c, d, meta, reason) {
+  if (!c.alive) return;
+  const T = byName(d.target);
+  if (NEEDS_TARGET.has(d.action) && (!T || T === c)) { d.note = `(no valid target "${d.target}", so it wanders)`; d.action = "wander"; }
+  c.action = { type: d.action, target: NEEDS_TARGET.has(d.action) ? T.name : null };
+  c.say = d.say; c.thought = d.thought; c.shownUntil = simT + 6; c.decisions++; c.lastTurn = simT; c.last = { ...d, reason, meta, personality: c.personality };
+  if (c.whisper) { remember(c, `A voice from the sky told me: "${c.whisper}"`); c.rumor = Math.max(c.rumor, 1); c.whisper = null; }
+  const verb = { wander: "wanders", eat: "goes to eat", rest: "rests" }[d.action] || `${d.action === "flee" ? "flees from" : d.action === "share" ? "shares with" : d.action + "s"} ${c.action.target}`;
+  story(`${c.name} ${verb}${d.say ? `: “${d.say}”` : "."}`, d.action === "attack" ? "attack" : d.action === "share" ? "share" : d.action === "tell" ? "tell" : d.say ? "say" : "", d.thought);
+  if (d.action === "tell" && T) {
+    const msg = d.say || "(says nothing)";
+    remember(T, `${c.name} told me: "${msg}"`);
+    if (c.rumor) T.rumor = Math.max(T.rumor, c.rumor + 1);
+    trigger(T, `${c.name} just told you: "${msg}"`, 2); burst(T, "tell");
+  } else if (d.say) for (const o of C) if (o.alive && o !== c && dist(o, c) < SEE) remember(o, `${c.name} said "${d.say}"`);
+  if (d.action === "attack" && T) { remember(T, `${c.name} is coming at me`); trigger(T, `${c.name} is charging at you to attack!`, 3); }
+}
+let model = null, NAT = null, stats = { n: 0, ms: 0, tok: 0, invalid: 0 }, spot = null, streamRaw = "";
+async function turnLoop() {
+  while (true) {
+    if (!running || frozen || !C.some(c => c.alive && c.brain === "bonsai")) { await sleep(250); continue; }
+    events = events.filter(e => e.c.alive && e.c.brain === "bonsai");
+    events.sort((a, b) => b.prio - a.prio || a.t - b.t);
+    let e = events.shift();
+    if (!e) { const c = C.filter(c => c.alive && c.brain === "bonsai").sort((a, b) => a.lastTurn - b.lastTurn)[0]; e = { c, reason: "Nothing special is happening right now." }; }
+    const c = e.c, reason = e.reason;
+    spot = { c, phase: "thinking", reasonText: reason }; streamRaw = "";
+    const P = buildPrompt(c, reason);
+    let r = null;
+    try { r = await NAT.ask(model, P.text, { maxNewTokens: 80, onToken: raw => { streamRaw = raw; } }); } catch (err) { console.warn(err); }
+    if (r && C.includes(c)) {
+      const d = parseDecision(r.raw); stats.n++; stats.ms += r.ms; stats.tok += r.tokens; if (!d.valid) stats.invalid++;
+      const k = ACTIONS.indexOf(d.action); if (k >= 0 && d.valid) { picks[k]++; totalPicks++; if (P.order[0] === d.action) firstPicks++; }
+      applyDecision(c, d, { ai: true, ms: r.ms, raw: r.raw }, reason);
+    }
+    if (!spot || !C.includes(c)) { spot = null; continue; }
+    spot.phase = "acting";
+    await sleep(mode === "arena" ? 250 : 2600);   // let the result play out before the next turn
+    spot = null;
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ===================== rendering =====================
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let S = 800; const fx = []; const cam = { x: .5, y: .5, z: 1 };
+function resize() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); S = Math.max(200, Math.round(Math.min(r.width, r.height) * d)); cv.width = S; cv.height = S; }
+addEventListener("resize", resize);
+const col = (c, l = 62) => c.alive ? `hsl(${c.hue} 85% ${l}%)` : "#4b5563";
+const ACOL = { attack: "#ff5c7a", share: "#4dffe1", follow: "rgba(230,237,243,.6)", flee: "#ffb84d", tell: "#ffd166" };
+function burst(c, type) { fx.push({ c, type, t: simT }); }
+function camTarget() {
+  if (!$("cine").checked || (mode === "arena" && !frozen)) return { x: .5, y: .5, z: 1 };
+  if (frozen && selected) return { x: selected.x, y: selected.y, z: 1.7 };
+  if (spot) { const T = spot.c.action.target && spot.phase === "acting" ? byName(spot.c.action.target) : null; return T ? { x: (spot.c.x + T.x) / 2, y: (spot.c.y + T.y) / 2, z: 1.45 } : { x: spot.c.x, y: spot.c.y, z: 1.6 }; }
+  return { x: .5, y: .5, z: 1 };
+}
+function draw(dtReal) {
+  const tg = camTarget(), k = 1 - Math.pow(0.08, dtReal);
+  cam.z += (tg.z - cam.z) * k; cam.x += (tg.x - cam.x) * k; cam.y += (tg.y - cam.y) * k;
+  const half = 0.5 / cam.z; cam.x = Math.min(1 - half, Math.max(half, cam.x)); cam.y = Math.min(1 - half, Math.max(half, cam.y));
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#05080c"; ctx.fillRect(0, 0, S, S);
+  const z = cam.z; ctx.setTransform(z, 0, 0, z, S / 2 - cam.x * S * z, S / 2 - cam.y * S * z);
+  const u = 1 / z;
+  ctx.strokeStyle = "#243044"; ctx.lineWidth = 3 * u; ctx.strokeRect(WALL * S * .5, WALL * S * .5, S - WALL * S, S - WALL * S);
+  ctx.fillStyle = "rgba(255,244,214,.85)";
+  for (const f of food) { ctx.beginPath(); ctx.arc(f.x * S, f.y * S, Math.max(3, S / 170), 0, 6.283); ctx.fill(); }
+  const r = Math.max(10, S / 40);
+  // relationship web
+  for (const a of C) { if (!a.alive || (mode !== "arena" && spot && a !== spot.c) || (mode !== "arena" && !spot)) continue; for (const [nm, v] of Object.entries(a.feelings)) { const b = byName(nm); if (!b || Math.abs(v) < 1) continue;
+    const mx = (a.x + b.x) / 2 * S - (b.y - a.y) * S * 0.12, my = (a.y + b.y) / 2 * S + (b.x - a.x) * S * 0.12;
+    ctx.strokeStyle = v > 0 ? `rgba(77,255,225,${0.12 + Math.abs(v) * 0.08})` : `rgba(255,92,122,${0.12 + Math.abs(v) * 0.08})`; ctx.lineWidth = (1 + Math.abs(v) * 0.5) * u;
+    ctx.beginPath(); ctx.moveTo(a.x * S, a.y * S); ctx.quadraticCurveTo(mx, my, b.x * S, b.y * S); ctx.stroke(); } }
+  // intent arrows
+  for (const c of C) { if (!c.alive || !c.action.target || (mode !== "arena" && spot && c !== spot.c)) continue; const T = byName(c.action.target); if (!T) continue;
+    ctx.strokeStyle = ACOL[c.action.type] || "#888"; ctx.lineWidth = 2.5 * u; ctx.setLineDash(c.action.type === "follow" ? [8 * u, 8 * u] : []);
+    const ang = Math.atan2(T.y - c.y, T.x - c.x), ex = T.x * S - Math.cos(ang) * r * 1.4, ey = T.y * S - Math.sin(ang) * r * 1.4;
+    ctx.beginPath(); ctx.moveTo(c.x * S, c.y * S); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.cos(ang - .4) * 12 * u, ey - Math.sin(ang - .4) * 12 * u); ctx.lineTo(ex - Math.cos(ang + .4) * 12 * u, ey - Math.sin(ang + .4) * 12 * u); ctx.fill(); }
+  for (let k2 = fx.length - 1; k2 >= 0; k2--) { const F = fx[k2], age = simT - F.t; if (age > 1.2) { fx.splice(k2, 1); continue; }
+    ctx.strokeStyle = ACOL[F.type] || "#fff"; ctx.lineWidth = 3 * u; ctx.globalAlpha = 1 - age / 1.2; ctx.beginPath(); ctx.arc(F.c.x * S, F.c.y * S, r * (1.2 + age * 2.5), 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
+  const fsz = Math.max(12, S / 55) * u;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const c of C) {
+    if (!c.alive && simT - c.diedAt > 15) continue;
+    const x = c.x * S, y = c.y * S, rr = r * (0.75 + 0.35 * Math.min(1, c.energy));
+    ctx.globalAlpha = c.alive ? 1 : Math.max(0.15, 1 - (simT - c.diedAt) / 15);
+    if (c.rumor && c.alive) { ctx.strokeStyle = "rgba(255,209,102,.85)"; ctx.lineWidth = 3 * u; ctx.setLineDash([4 * u, 5 * u]); ctx.beginPath(); ctx.arc(x, y, rr + 9 * u, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); }
+    if (c === selected) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2 * u; ctx.beginPath(); ctx.arc(x, y, rr + 15 * u, 0, 6.283); ctx.stroke(); }
+    ctx.fillStyle = col(c); ctx.beginPath(); ctx.arc(x, y, rr, 0, 6.283); ctx.fill();
+    if (c.alive) { ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 3 * u; ctx.beginPath(); ctx.arc(x, y, rr + 4 * u, -Math.PI / 2, -Math.PI / 2 + 6.283 * Math.min(1, c.energy)); ctx.stroke(); }
+    ctx.font = `700 ${fsz}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = c.alive ? "#e6edf3" : "#6b7280";
+    ctx.fillText(c.alive ? c.name : c.name + " ✝", x, y + rr + 8 * u);
+    if (mode === "arena") { ctx.font = `600 ${fsz * .8}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = c.brain === "bonsai" ? "#4dff88" : "#8b98a9"; ctx.fillText(brainLabel(c), x, y + rr + 8 * u + fsz * 1.2); }
+    ctx.globalAlpha = 1;
+  }
+  if (spot && spot.c.alive) {
+    const x = spot.c.x * S, y = spot.c.y * S, g = ctx.createRadialGradient(x, y, r * 2, x, y, S * 0.35);
+    g.addColorStop(0, "rgba(5,8,12,0)"); g.addColorStop(1, "rgba(5,8,12,.55)"); ctx.fillStyle = g; ctx.fillRect(-S, -S, S * 3, S * 3);
+    if (spot.phase === "thinking") { const p = (performance.now() / 600) % 1; ctx.strokeStyle = `rgba(77,255,136,${1 - p})`; ctx.lineWidth = 3 * u; ctx.beginPath(); ctx.arc(x, y, r * (1.4 + p * 1.2), 0, 6.283); ctx.stroke(); }
+  }
+  const onStage = mode === "arena" ? C.filter(c => c.alive && simT < c.shownUntil && (c.say || c.thought)).slice(-1) : (spot && spot.phase === "acting" && spot.c.alive ? [spot.c] : []);
+  for (const c of onStage) bubbles(c, r, u);
+  if (spot && spot.phase === "thinking" && spot.c.alive) codeStrip(spot.c, r, u);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (mode !== "arena" && spot && spot.c.alive) caption(spot);
+}
+function caption(sp) {
+  const c = sp.c, L = c.last, fs = Math.max(13, S / 52);
+  const role = c.personality.split(/[:,]/)[0].replace(/^an? /, "");
+  let line1 = `${c.name}, ${role}`, line2;
+  if (sp.phase === "thinking") line2 = `Bonsai is deciding for ${c.name}… (${(sp.reasonText || "").replace(/^You (just )?/, "").slice(0, 70)})`;
+  else if (L) line2 = `→ ${L.action === "eat" ? "goes to eat" : L.action === "rest" ? "rests" : L.action === "wander" ? "wanders" : L.action + " " + (c.action.target || "")}`;
+  else line2 = "";
+  ctx.font = `700 ${fs}px ui-sans-serif,system-ui,sans-serif`; const w1 = ctx.measureText(line1).width;
+  ctx.font = `${fs}px ui-sans-serif,system-ui,sans-serif`; const w2 = ctx.measureText(line2).width;
+  const w = Math.min(S - 24, Math.max(w1, w2) + fs * 1.6), h = fs * 3.2, x = (S - w) / 2, y = S - h - 12;
+  ctx.fillStyle = "rgba(17,23,34,.92)"; ctx.strokeStyle = col(c); ctx.lineWidth = 2; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+  ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = col(c); ctx.font = `700 ${fs}px ui-sans-serif,system-ui,sans-serif`; ctx.fillText(line1, S / 2, y + fs * 0.35);
+  ctx.fillStyle = "#e6edf3"; ctx.font = `${fs}px ui-sans-serif,system-ui,sans-serif`; ctx.fillText(line2, S / 2, y + fs * 1.65);
+}
+function wrapLines(text, maxW) { const words = text.split(/\s+/), lines = []; let line = ""; for (const w of words) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines.slice(0, 3); }
+function box(x, yBottom, text, fsz, bg, fg, border, italic) {
+  ctx.font = `${italic ? "italic " : ""}${fsz}px ui-sans-serif,system-ui,sans-serif`;
+  const lines = wrapLines(text, S * 0.3 / cam.z);
+  const pad = fsz * .55, w = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad * 2, h = lines.length * fsz * 1.25 + pad * 2;
+  const left = S * (cam.x - .5 / cam.z) + 4 / cam.z, right = S * (cam.x + .5 / cam.z) - 4 / cam.z;
+  const top = S * (cam.y - .5 / cam.z) + 4 / cam.z;
+  const bx = Math.min(right - w, Math.max(left, x - w / 2)), by = Math.max(top, yBottom - h);
+  ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = 1.5 / cam.z; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 8 / cam.z); else ctx.rect(bx, by, w, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = fg; ctx.textAlign = "left"; ctx.textBaseline = "top"; lines.forEach((l, k) => ctx.fillText(l, bx + pad, by + pad + k * fsz * 1.25)); ctx.textAlign = "center";
+  return by;
+}
+function bubbles(c, r, u) {
+  const fsz = Math.max(13, S / 50) * u, x = c.x * S; let y = c.y * S - r - 14 * u;
+  if (c.thought) y = box(x, y, "💭 " + c.thought, fsz * .9, "rgba(70,12,24,.95)", "#ffd6de", "#ff5c7a", true) - 6 * u;
+  if (c.say) box(x, y, "💬 " + c.say, fsz, "rgba(240,244,248,.97)", "#0a0e14", col(c), false);
+}
+function codeStrip(c, r, u) {
+  const fsz = Math.max(11, S / 64) * u, txt = (streamRaw || "Bonsai is thinking…").replace(/\s+/g, " ").slice(-64);
+  ctx.font = `${fsz}px ui-monospace,Menlo,monospace`; const w = Math.min(S * 0.5 * u, ctx.measureText(txt).width + 16 * u), x = c.x * S - w / 2, y = c.y * S + r + 46 * u, h = fsz * 1.9;
+  ctx.fillStyle = "rgba(10,20,14,.92)"; ctx.strokeStyle = "#2b6b45"; ctx.lineWidth = 1.5 * u; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6 * u); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.fillStyle = "#4dff88"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, x + 8 * u, y + h / 2); ctx.restore(); ctx.textAlign = "center";
+}
+function toWorld(e) { const b = cv.getBoundingClientRect(), sx = (e.clientX - b.left) / b.width * S, sy = (e.clientY - b.top) / b.height * S; return { x: (sx - (S / 2 - cam.x * S * cam.z)) / (S * cam.z), y: (sy - (S / 2 - cam.y * S * cam.z)) / (S * cam.z) }; }
+cv.addEventListener("click", e => {
+  const { x, y } = toWorld(e); let best = null, bd = 0.06 / cam.z;
+  for (const c of C) { const d = Math.hypot(c.x - x, c.y - y); if (d < bd) { bd = d; best = c; } }
+  if (best) { selected = best; showTab("mind"); renderMind(); if (!frozen) { $("ab").hidden = true; $("abBtns").hidden = true; $("rethinkOut").textContent = ""; } }
+  else { for (let k = 0; k < 3; k++) food.push({ x: clampIn(x + (rnd() - .5) * .04), y: clampIn(y + (rnd() - .5) * .04) }); }
+});
+
+const brainLabel = c => c.brain === "bonsai" ? (model && model.stub ? "STUB" : "Bonsai") : BOTS[c.brain].label;
+function arenaTick(dt) {
+  if (mode !== "arena") return;
+  roundT += dt;
+  const alive = C.filter(c => c.alive);
+  if (roundT >= 120 || !alive.length) finishRound();
+}
+function finishRound() {
+  const ranked = [...C].sort((a, b) => ((b.alive ? 1e6 : b.diedAt) + b.energy) - ((a.alive ? 1e6 : a.diedAt) + a.energy));
+  ranked.forEach((c, k) => {
+    const b = board[c.brain] || (board[c.brain] = { rounds: 0, survived: 0, life: 0, ate: 0, stole: 0, wins: 0 });
+    b.rounds++; if (c.alive) b.survived++; b.life += c.alive ? roundT : c.diedAt; b.ate += c.ate; b.stole += c.stole; if (k === 0) b.wins++;
+  });
+  story(`Round ${round} over. Winner: ${ranked[0].name} (${brainLabel(ranked[0])}). Bonsai's ${C.find(c => c.brain === "bonsai").name} ${C.find(c => c.brain === "bonsai").alive ? "survived" : "died"}.`, "god");
+  bonsaiSeat = (bonsaiSeat + 1) % CAST.length; simT = 0; newVillage(); renderBoard();
+}
+function renderBoard() {
+  const rows = Object.entries(board).sort((a, b) => b[1].wins - a[1].wins || b[1].life / b[1].rounds - a[1].life / a[1].rounds);
+  $("board").innerHTML = rows.length ? `<table class="sb"><tr><th>Brain</th><th>Rounds</th><th>Wins</th><th>Survived</th><th>Avg life</th><th>Food/rd</th><th>Stolen/rd</th></tr>${rows.map(([k, b]) => `<tr class="${k === "bonsai" ? "bonsai" : ""}"><td>${k === "bonsai" ? (model && model.stub ? "STUB model" : "Bonsai 2B") : BOTS[k].label}</td><td>${b.rounds}</td><td>${b.wins}</td><td>${Math.round(b.survived / b.rounds * 100)}%</td><td>${Math.round(b.life / b.rounds)} s</td><td>${(b.ate / b.rounds).toFixed(1)}</td><td>${(b.stole / b.rounds).toFixed(2)}</td></tr>`).join("")}</table>` : "<p class='small'>The scoreboard fills in after the first 2-minute round.</p>";
+  $("botRules").innerHTML = Object.values(BOTS).map(b => `<li><b>${b.label}:</b> ${b.rule}</li>`).join("");
+}
+function toggleMode() {
+  mode = mode === "village" ? "arena" : "village"; round = 0; board = {}; bonsaiSeat = 0;
+  $("mode").textContent = mode === "arena" ? "Mode: Bonsai vs bots" : "Mode: all Bonsai";
+  $("brandText").textContent = mode === "arena" ? "One creature is played by Bonsai 2B, running on your GPU inside this tab. The other five are hand-written bots. Same bodies, same rules: who survives longer?" : "Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. The camera follows whoever it is thinking for. White bubbles are what they say; red bubbles are what they secretly think."; $("tab-arena").hidden = mode !== "arena";
+  newVillage(); renderBoard(); showTab(mode === "arena" ? "arena" : "mind");
+}
+
+// ===================== panels =====================
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function showTab(t) { for (const k of ["mind", "story", "arena"]) { $("tab-" + k).setAttribute("aria-selected", k === t); $("pane-" + k).hidden = k !== t; } }
+for (const k of ["mind", "story", "arena"]) $("tab-" + k).onclick = () => showTab(k);
+$("mode").onclick = toggleMode;
+function story(text, kind, thought) {
+  const e = document.createElement("div"); e.className = "ev " + (kind || "");
+  e.innerHTML = `<span class="t">${fmtT(simT)}</span>${esc(text)}${thought ? `<span class="th">💭 ${esc(thought)}</span>` : ""}`;
+  const f = $("feed"); f.prepend(e); while (f.children.length > 150) f.lastChild.remove();
+}
+const actHtml = d => `<b class="${d.action}">${esc(d.action)}${d.target && NEEDS_TARGET.has(d.action) ? " " + esc(d.target) : ""}</b>`;
+function renderMind() {
+  const c = selected; if (!c) return;
+  $("mDot").style.background = col(c); $("mName").textContent = c.name + (c.alive ? "" : " (dead)"); $("mPers").textContent = c.personality; $("wName").textContent = c.name;
+  $("mEnergy").textContent = Math.round(c.energy * 100) + "%"; $("mBar").style.width = Math.min(100, c.energy * 100) + "%"; $("mBar").style.background = col(c);
+  const L = c.last;
+  if (c.brain !== "bonsai") { $("mWhy").textContent = "Rule-based bot (no AI)"; $("mAction").innerHTML = actHtml({ action: c.action.type, target: c.action.target || "" }); $("mSay").textContent = BOTS[c.brain].rule; $("mThought").textContent = ""; $("mMeta").innerHTML = '<span class="tag">' + BOTS[c.brain].label + '</span>'; $("mDecision").className = "card"; }
+  else {
+  $("mWhy").textContent = L ? `Latest decision · because: ${L.reason}` : "Latest decision";
+  $("mAction").innerHTML = L ? actHtml(L) + (L.note ? ` <span class="small">${esc(L.note)}</span>` : "") : "Waiting for its first turn…";
+  $("mSay").textContent = L && L.say ? "💬 " + L.say : ""; $("mThought").textContent = L && L.thought ? "💭 " + L.thought : "";
+  $("mMeta").innerHTML = L && L.meta ? `<span class="tag ai">${model && model.stub ? "STUB model" : "Bonsai 2B"} · ${(L.meta.ms / 1000).toFixed(1)} s</span>` : "";
+  $("mDecision").className = "card" + (L ? " ai" : "");
+  }
+  $("mMem").innerHTML = c.memory.length ? c.memory.map(m => `<li>${esc(m.text)} <span style="color:var(--muted)">· ${Math.round(simT - m.t)} s ago</span></li>`).join("") : "<li style='color:var(--muted)'>Nothing yet.</li>";
+  const fe = Object.entries(c.feelings).filter(([, v]) => Math.abs(v) >= 1);
+  $("mFeel").innerHTML = fe.length ? fe.map(([k, v]) => `<span style="color:${v < 0 ? "var(--neg)" : "var(--teal)"}">${feelWord(v)} ${esc(k)}</span>`).join("") : "<span style='color:var(--muted)'>No strong feelings yet.</span>";
+}
+$("whisperBtn").onclick = () => {
+  const c = selected, t = $("whisper").value.trim(); if (!c || !t || !c.alive) return;
+  if (c.brain !== "bonsai") { $("whisperOut").textContent = `${c.name} is a rule-based bot. It can't hear you.`; return; }
+  c.whisper = t; trigger(c, "A voice from the sky just whispered to you.", 4); story(`A voice from the sky whispered to ${c.name}: “${t}”`, "god");
+  $("whisperOut").textContent = model ? `${c.name} reacts on its next turn. A gold ring marks everyone who has heard it.` : "Bonsai isn't awake yet.";
+};
+
+// Freeze & re-think: the same frozen moment, two personalities, two real Bonsai decisions side by side
+let frozen = false, rethinkState = null;
+document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => { $("newPers").value = b.dataset.p; });
+$("rethink").onclick = async () => {
+  const c = selected, np = $("newPers").value.trim();
+  if (!model) { $("rethinkOut").textContent = "Bonsai isn't awake yet."; return; }
+  if (!c || !c.alive || !np) return;
+  if (c.brain !== "bonsai") { $("rethinkOut").textContent = `${c.name} is a rule-based bot; only Bonsai creatures can be rewritten.`; return; }
+  const btn = $("rethink"); btn.disabled = true; frozen = true; $("rethinkOut").textContent = "Frozen. Bonsai is deciding twice…"; $("ab").hidden = true; $("abBtns").hidden = true;
+  while (spot) await sleep(50);
+  const reason = c.last ? c.last.reason : "Nothing special is happening right now.";
+  const run = async pers => { const P = buildPrompt(c, reason, pers); const r = await NAT.ask(model, P.text, { maxNewTokens: 80 }); return { ...parseDecision(r.raw), ms: r.ms }; };
+  try {
+    const a = await run(c.personality), b = await run(np);
+    const show = (d, el) => { $(el).innerHTML = `${actHtml(d)}<div class="say">${d.say ? "💬 " + esc(d.say) : ""}</div><div class="thought">${d.thought ? "💭 " + esc(d.thought) : ""}</div>`; };
+    show(a, "abA"); show(b, "abB"); $("ab").hidden = false; $("abBtns").hidden = false;
+    $("rethinkOut").textContent = a.action === b.action && a.target === b.target ? "Same action, different words." : "The new personality changed the decision.";
+    rethinkState = { c, np, b, reason };
+    story(`Re-think on ${c.name}: as “${c.personality}” it would ${a.action}${a.target ? " " + a.target : ""}; as “${np}” it would ${b.action}${b.target ? " " + b.target : ""}.`, "god");
+  } catch (e) { console.warn(e); $("rethinkOut").textContent = "Something went wrong; try again."; frozen = false; }
+  btn.disabled = false;
+};
+$("keep").onclick = () => { const s = rethinkState; if (!s) return; s.c.personality = s.np; applyDecision(s.c, s.b, { ai: true, ms: s.b.ms }, s.reason); story(`${s.c.name} is now ${s.np}.`, "god"); $("abBtns").hidden = true; frozen = false; renderMind(); };
+$("undo").onclick = () => { $("abBtns").hidden = true; $("ab").hidden = true; frozen = false; $("rethinkOut").textContent = "Unfrozen, personality unchanged."; };
+
+let running = true;
+$("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
+$("feast").onclick = () => { for (let k = 0; k < 20; k++) food.push({ x: clampIn(rnd()), y: clampIn(rnd()) }); story("A feast fell from the sky.", "god"); };
+$("famine").onclick = () => { food = []; famineUntil = simT + 20; story("Famine: every crumb vanished, and nothing will grow for 20 seconds.", "god"); C.forEach(c => { if (c.alive) { remember(c, "All the food suddenly vanished"); trigger(c, "All the food in the dish just vanished. Famine.", 2); } }); };
+$("reset").onclick = () => newVillage();
+
+// ===================== waking Bonsai (automatic) =====================
+function stubModel() {   // ?stub=1: a fake model for testing the UI without a GPU; labeled STUB everywhere
+  return { stub: true, async ask(prompt, o) { const names = [...prompt.matchAll(/^- ([A-Z][a-zA-Z]+):/gm)].map(m => m[1]); const a = names.length && Math.random() < .6 ? ["follow", "attack", "share", "flee", "tell"][(Math.random() * 5) | 0] : "eat";
+    const raw = JSON.stringify({ action: a, target: names[0] || "", say: Math.random() < .6 ? "stub line from the test model" : "", thought: "stub secret thought" });
+    for (let i = 10; i <= raw.length + 9; i += 10) { o?.onToken?.(raw.slice(0, i)); await sleep(40); } return { raw, ms: 600, tokens: 30, tps: 50 }; } };
+}
+async function wake() {
+  const st = $("status");
+  const llama = new URLSearchParams(location.search).get("llama");
+  if (llama) {   // ?llama=http://host:port : the same Bonsai 2B weights served by PrismML's llama.cpp (used for automated tests); labeled
+    model = { llama: true }; NAT = { ask: async (m, prompt, o = {}) => {
+      const t = performance.now();
+      const r = await fetch(llama + "/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: prompt }], max_tokens: o.maxNewTokens || 80, temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.5, chat_template_kwargs: { enable_thinking: false } }) });
+      const j = await r.json(), raw = j.choices[0].message.content || "", ms = performance.now() - t, tokens = j.usage?.completion_tokens || 0;
+      o.onToken?.(raw); return { raw, ms, tokens, tps: tokens / (ms / 1000) }; } };
+    $("veil").hidden = true; st.textContent = "Bonsai 2B via llama.cpp (test mode)"; st.className = "status on"; return true;
+  }
+  if (new URLSearchParams(location.search).has("stub")) { const s = stubModel(); NAT = { ask: (m, p, o) => s.ask(p, o) }; model = s; $("veil").hidden = true; st.textContent = "STUB model (test mode, not Bonsai)"; return true; }
+  if (!navigator.gpu) {
+    $("veilTitle").textContent = "This browser can't run Bonsai";
+    $("veilText").textContent = "Bonsai needs WebGPU: Chrome or Edge on a laptop, or Safari 26. Every creature here is played by the model, so there's nothing to show without it.";
+    $("veilProg").hidden = true; st.textContent = "Bonsai: needs WebGPU"; return false;
+  }
+  try {
+    NAT = await import("./naturalist.mjs");
+    const r = await NAT.loadModel({ vision: false,
+      onProgress: f => { if (f != null) { $("veilBar").style.width = (f * 100).toFixed(1) + "%"; $("veilText").textContent = `Downloading the model into your browser: ${Math.round(f * NAT.TEXT_MB)} / ${NAT.TEXT_MB} MB. After this it loads from cache in seconds.`; } },
+      onStatus: m => { $("veilTitle").textContent = "Preparing Bonsai on your GPU…"; $("veilText").textContent = m; } });
+    model = r.model; $("veil").hidden = true;
+    st.textContent = "Bonsai 2B: running on your GPU"; st.className = "status on";
+    story(`Bonsai 2B woke up in ${(r.loadMs / 1000).toFixed(1)} s and took over every creature.`, "god");
+    return true;
+  } catch (e) {
+    console.warn(e); $("veilTitle").textContent = "Couldn't start Bonsai here";
+    $("veilText").textContent = (e?.message || String(e)) + " Try Chrome on a laptop."; $("veilProg").hidden = true; st.textContent = "Bonsai: failed to load"; return false;
+  }
+}
+
+// ===================== loop =====================
+let lastFrame = performance.now(), panelT = 0;
+function frame(t) {
+  const dtReal = Math.min(0.05, (t - lastFrame) / 1000); lastFrame = t;
+  const slow = mode === "arena" ? (spot ? 0.5 : 1) : (spot && spot.phase === "thinking" ? 0 : 0.7);   // village is turn-based: the world holds still while Bonsai thinks
+  if (running && !frozen && model) { tick(dtReal * slow); arenaTick(dtReal * slow); }
+  draw(dtReal);
+  if (t - panelT > 400) {
+    panelT = t; if (!$("pane-mind").hidden) renderMind();
+    if (mode === "arena") { $("roundInfo").textContent = `Round ${round} · ${Math.round(roundT)} / 120 s · Bonsai is playing ${C.find(c => c.brain === "bonsai")?.name}`; $("roundBar").style.width = Math.min(100, roundT / 1.2) + "%"; }
+    $("perf").textContent = stats.n ? `${stats.n} ${model && model.stub ? "STUB" : "Bonsai"} decisions · ${(stats.ms / stats.n / 1000).toFixed(1)} s each · ${(stats.tok / (stats.ms / 1000)).toFixed(0)} tok/s · 0 server calls` : (model ? "Bonsai is thinking…" : "");
+    $("dist").textContent = totalPicks ? `Picks: ${ACTIONS.map((a, k) => `${a} ${Math.round(picks[k] / totalPicks * 100)}%`).join(" · ")} · chose the first-listed option ${Math.round(firstPicks / totalPicks * 100)}% (chance ${Math.round(100 / ACTIONS.length)}%)${stats.invalid ? ` · ${stats.invalid} unreadable` : ""}` : "";
+  }
+  requestAnimationFrame(frame);
+}
+window.BV = { get C() { return C; }, get stats() { return stats; }, select: n => { selected = byName(n) || selected; renderMind(); }, buildPrompt, parseDecision, get picks() { return { picks, firstPicks, totalPicks }; } };
+resize(); newVillage(); requestAnimationFrame(frame); wake().then(ok => { if (ok) turnLoop(); });
+</script>
+</body>
+</html>
