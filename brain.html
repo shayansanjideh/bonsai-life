@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bonsai brain explorer</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111722;--panel2:#161e2b;--line:#243044;--text:#e6edf3;--muted:#8b98a9;--accent:#4dff88;--warn:#ffb84d;--neg:#ff5c7a;--s1:#3987e5;--s2:#d95926}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.app{max-width:1400px;margin:0 auto;padding:14px max(16px,env(safe-area-inset-left,0px)) 40px;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap}
+.brand h1{font-size:20px;margin:0;line-height:1.2}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px;max-width:760px}
+.kpis{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap;align-items:center}
+.kpi .k{font-size:11px;color:var(--muted)}
+.kpi .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.status{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.status.on{color:var(--accent);border-color:#2b6b45}
+.status.err{color:var(--neg);border-color:#6b2b3a}
+button,select,input[type=number]{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+button{cursor:pointer}
+button:hover:not(:disabled){border-color:#3a4b66}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:#173b28;border-color:#2b6b45;color:var(--accent);font-weight:600}
+button.danger{background:#3a1720;border-color:#6b2b3a;color:#ffb3c0}
+textarea{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;resize:vertical;min-height:58px}
+label{color:var(--muted);font-size:12.5px;display:inline-flex;gap:6px;align-items:center}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 470px;gap:16px;align-items:start}
+@media (max-width:1000px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel h2{font-size:14px;margin:0;font-weight:600}
+.hint{color:var(--muted);font-size:12px;margin:0}
+.row{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center}
+.out{white-space:pre-wrap;word-break:break-word;background:#0c1119;border:1px solid var(--line);border-radius:10px;padding:12px;min-height:150px;font:15px/1.6 ui-sans-serif,system-ui,sans-serif}
+.out .prompt{color:var(--muted)}
+.tok{border-radius:3px;cursor:pointer;padding:1px 0}
+.tok:hover{outline:1px solid #6b7c96}
+.tok.sel{outline:2px solid var(--accent)}
+.tok.forked{text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
+.tok.picked{text-decoration:underline dotted;text-decoration-color:var(--warn);text-underline-offset:3px}
+.caret{display:inline-block;width:7px;height:1em;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(2) infinite;margin-left:1px}
+@keyframes blink{50%{opacity:0}}
+.cands{display:flex;flex-direction:column;gap:4px}
+.cand{display:grid;grid-template-columns:minmax(0,1fr) 54px;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 9px;text-align:left;cursor:pointer;position:relative;overflow:hidden}
+.cand .bar{position:absolute;left:0;top:0;bottom:0;background:rgba(57,135,229,.22);pointer-events:none}
+.cand .t{position:relative;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cand .p{position:relative;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
+.cand.chosen{border-color:var(--accent)}
+.cand.static{cursor:default}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:700px){.compare{grid-template-columns:1fr}}
+.compare .box{background:#0c1119;border:1px solid var(--line);border-radius:10px;padding:10px;white-space:pre-wrap;font-size:13.5px;max-height:220px;overflow:auto}
+.compare .lab{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px -14px 0;padding:0 10px}
+.tabs button{border:0;background:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 10px;color:var(--muted)}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.tabpane{display:none;flex-direction:column;gap:10px}
+.tabpane.on{display:flex}
+.brain{display:grid;gap:3px;overflow-x:auto;padding-bottom:4px}
+.brain .lh{font-size:10px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.brain .rl{font-size:11px;color:var(--muted);white-space:nowrap;padding-right:4px;align-self:center}
+.cell{height:26px;min-width:14px;border-radius:4px;border:1px solid #2f4a3a;background:#173b28;cursor:pointer;padding:0;font-size:10px;color:#7fbf98}
+.cell.full{background:#1b3550;border-color:#2e5680;color:#9cc4f0}
+.cell.off{background:#3a1720;border-color:#a33a52;color:#ff9db0}
+.meter{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.meter .k{color:var(--muted)}
+.meter .v{font-variant-numeric:tabular-nums}
+.big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+input[type=range]{width:180px;accent-color:var(--accent)}
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+table.t{border-collapse:collapse;width:100%;font-size:12.5px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+table.t th{color:var(--muted);font-weight:500}
+table.t td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tip{position:fixed;pointer-events:none;background:#0b0f16;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;z-index:10;display:none;max-width:260px}
+.target{font-size:22px;font-weight:700;color:var(--warn)}
+.win{color:var(--accent);font-weight:600}
+.err{color:var(--neg);font-size:12.5px;white-space:pre-wrap}
+.progress{height:4px;background:var(--panel2);border-radius:2px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+a{color:#7fb6ff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">
+      <h1>Bonsai brain explorer</h1>
+      <p>Ternary-Bonsai-2-2B runs on your GPU in this tab, with every weight -1, 0 or +1. Watch its next-token odds as it writes, click any word to take a different branch, and switch off parts of its weights to see what breaks. A cloud API can't let you do the last two.</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="k">speed</div><div class="v" id="kSpeed">–</div></div>
+      <div class="kpi"><div class="k">weights off</div><div class="v" id="kOff">0%</div></div>
+      <div class="kpi"><div class="k">reference loss</div><div class="v" id="kLoss">–</div></div>
+      <span class="status" id="status">model not loaded</span>
+      <button class="primary" id="btnLoad">Wake Bonsai (429 MB)</button>
+    </div>
+  </div>
+  <div class="progress" id="prog" hidden><i></i></div>
+  <div class="err" id="err" hidden></div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Write</h2>
+      <textarea id="prompt">Explain in two sentences why the sky is blue.</textarea>
+      <div class="row">
+        <button class="primary" id="btnGen" disabled>Generate</button>
+        <button id="btnStop" disabled>Stop</button>
+        <label><select id="mode"><option value="chat">Chat</option><option value="raw">Raw text</option></select></label>
+        <label>temperature <input type="range" id="temp" min="0" max="1.5" step="0.05" value="0" style="width:100px"><span id="tempV">0</span></label>
+        <label>max tokens <input type="number" id="maxTok" value="120" min="1" max="1000" style="width:72px"></label>
+        <label><input type="checkbox" id="pickMode"> I pick every token</label>
+      </div>
+      <div class="out" id="out"><span class="prompt">Load the model, then press Generate.</span></div>
+      <p class="hint">Shading shows how surprised the model was by its own pick: darker red means it chose a less likely token. Click any token to see the alternatives it considered, and click one to rewrite from there.</p>
+      <div class="row" style="align-items:flex-start">
+        <div style="flex:1 1 220px;min-width:0">
+          <div class="hint" id="liveLab" style="margin-bottom:6px">Next token</div>
+          <div class="cands" id="live"></div>
+        </div>
+        <div style="flex:1 1 220px;min-width:0">
+          <div class="hint" id="inspLab" style="margin-bottom:6px">Click a token to inspect it</div>
+          <div class="cands" id="insp"></div>
+        </div>
+      </div>
+      <div id="compareWrap" hidden>
+        <div class="compare">
+          <div><div class="lab">Intact brain (same prompt, greedy)</div><div class="box" id="cmpA"></div></div>
+          <div><div class="lab" id="cmpBLab">Damaged brain</div><div class="box" id="cmpB"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tabs" id="tabs">
+        <button class="on" data-tab="surgery">Brain surgery</button>
+        <button data-tab="scan">Lesion scan</button>
+        <button data-tab="game">Make it say it</button>
+      </div>
+
+      <div class="tabpane on" id="tab-surgery">
+        <p class="hint">Each column is one layer. Top row: the token mixer (blue = full attention, green = linear attention). Bottom row: the MLP. Click a cell to switch that block's ternary weights to 0. Edits happen in GPU memory and are fully reversible.</p>
+        <div class="brain" id="brain"></div>
+        <div class="row">
+          <label>random damage <input type="range" id="rand" min="0" max="60" step="1" value="0"><span id="randV">0%</span></label>
+          <label><select id="dmgMode"><option value="zero">set to 0</option><option value="flip">flip sign</option></select></label>
+          <button id="btnReseed" title="new random pattern">reroll</button>
+          <button class="danger" id="btnRestore">Restore all</button>
+        </div>
+        <label><input type="checkbox" id="autoRewrite" checked> Rewrite the prompt after each edit</label>
+        <div class="meter">
+          <span class="k">Weights off</span><span class="v" id="mOff">0%</span>
+          <span class="k">Reference loss</span><span class="v" id="mLoss">–</span>
+          <span class="k">Intact loss</span><span class="v" id="mLoss0">–</span>
+        </div>
+        <p class="hint">Reference loss is the average surprise (nats per token) on a fixed paragraph of easy facts. Lower is smarter. Damage works in chunks of 128 weights, the unit that shares one scale factor.</p>
+      </div>
+
+      <div class="tabpane" id="tab-scan">
+        <p class="hint">Knock out each block on its own, put it back, and measure how much the reference loss rises. Tall bars are the blocks the model can't live without.</p>
+        <div class="row"><button class="primary" id="btnScan" disabled>Run lesion scan</button><button id="btnSweep" disabled>Run damage sweep</button><button id="btnScanStop" disabled>Stop</button><span class="hint" id="scanStat"></span></div>
+        <div class="legend" id="scanLegend" hidden><span><i style="background:var(--s1)"></i>token mixer off</span><span><i style="background:var(--s2)"></i>MLP off</span></div>
+        <div class="chart" id="scanChart"></div>
+        <details id="scanTableWrap" hidden><summary class="hint">Table view</summary><div id="scanTable"></div></details>
+        <div id="sweepOut"></div>
+      </div>
+
+      <div class="tabpane" id="tab-game">
+        <p class="hint">Steer Bonsai into saying the target phrase. You only get to pick from its top 5 choices at each step. Fewest picks wins. Brain damage is allowed.</p>
+        <div>Target: <span class="target" id="gTarget">–</span></div>
+        <div class="row"><button class="primary" id="btnGame" disabled>Start round</button><button id="btnNewTarget">New target</button><label>or your own <input id="gCustom" placeholder="type a target" style="font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 9px;width:150px"></label></div>
+        <div class="meter"><span class="k">Picks</span><span class="v" id="gPicks">0</span><span class="k">Best</span><span class="v" id="gBest">–</span></div>
+        <div id="gMsg" class="hint"></div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Engine: PrismML's WebGPU runtime from their Talk app (Apache-2.0). Weights load once from Hugging Face and stay cached. <a href="./index.html">Bonsai-Life</a> · <a href="?stub=1">stub mode (no GPU)</a></p>
+</div>
+<div class="tip" id="tip"></div>
+
+<script type="module">
+import { loadRealEngine, StubEngine, softmaxTop, logProb, sample } from "./brain-engine.mjs";
+
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const REF_TEXT = "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight.";
+const TARGETS = ["banana", "I am a robot", "purple elephant", "Tokyo", "pizza", "dinosaur", "I love you", "the moon", "sorry"];
+const GAME_PROMPT = "Tell me about your day.";
+
+let eng = null;
+const S = { prompt: [], steps: [], running: false, stop: false, sel: -1, pickResolve: null, game: null };
+const dmg = { knock: new Set(), random: 0, mode: "zero", seed: 1 };
+let intactLoss = null, intact = new Map(), lockTail = Promise.resolve();
+
+function lock(fn) { const p = lockTail.then(fn, fn); lockTail = p.catch(() => {}); return p; }
+function setStatus(t, cls = "") { const s = $("status"); s.textContent = t; s.className = "status " + cls; }
+function showErr(e) { const el = $("err"); el.hidden = !e; el.textContent = e ? String(e?.stack || e) : ""; if (e) console.error(e); }
+function pct(x, d = 1) { return (x * 100).toFixed(d) + "%"; }
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const vis = s => s === "" ? "∅" : s.replace(/\n/g, "↵").replace(/\t/g, "⇥");
+function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch { return null; } }
+
+// ---------- loading ----------
+$("btnLoad").onclick = async () => {
+  $("btnLoad").disabled = true; showErr(null);
+  try {
+    if (params.has("stub")) { eng = new StubEngine(); }
+    else {
+      $("prog").hidden = false;
+      eng = await loadRealEngine({
+        onProgress: f => { $("prog").firstElementChild.style.width = pct(f); setStatus(`downloading ${Math.round(f * 429)} / 429 MB`); },
+        onStatus: m => setStatus(m.length > 46 ? m.slice(0, 46) + "…" : m),
+      });
+      $("prog").hidden = true;
+    }
+    window.brain = { eng, S, dmg }; // for poking from the console
+    buildBrain();
+    setStatus(`${eng.name} ready`, "on");
+    $("btnLoad").textContent = "Loaded"; for (const b of ["btnGen", "btnScan", "btnSweep", "btnGame"]) $(b).disabled = false;
+    await lock(async () => { if (eng.surgeon.init) await eng.surgeon.init(); intactLoss = await refLoss(); });
+    $("mLoss0").textContent = intactLoss.toFixed(3) + " nats"; renderLoss(intactLoss);
+  } catch (e) { showErr(e); setStatus("load failed", "err"); $("btnLoad").disabled = false; $("prog").hidden = true; }
+};
+
+// ---------- generation ----------
+function render() {
+  const out = $("out"); const parts = [`<span class="prompt">${esc(S.promptText ?? "")}</span>`];
+  S.steps.forEach((st, i) => {
+    const a = Math.min(0.6, -Math.log10(Math.max(st.p, 1e-6)) * 0.22);
+    const cls = "tok" + (i === S.sel ? " sel" : "") + (st.forked ? " forked" : "") + (st.picked ? " picked" : "");
+    parts.push(`<span class="${cls}" data-i="${i}" style="background:rgba(255,92,122,${a.toFixed(3)})">${esc(eng.piece(st.id))}</span>`);
+  });
+  if (S.running) parts.push('<span class="caret"></span>');
+  out.innerHTML = parts.join("");
+}
+function candHTML(top, chosen, clickable) {
+  return top.map(c => `<button class="cand${c.id === chosen ? " chosen" : ""}${clickable ? "" : " static"}" data-id="${c.id}"><span class="bar" style="width:${(c.p * 100).toFixed(1)}%"></span><span class="t">${esc(vis(eng.piece(c.id)))}</span><span class="p">${pct(c.p)}</span></button>`).join("");
+}
+function showLive(top, chosen = -1, picking = false) {
+  $("liveLab").textContent = picking ? "Your pick: choose the next token" : "Next token (live)";
+  $("live").innerHTML = candHTML(top, chosen, picking);
+}
+function inspect(i) {
+  S.sel = i; render();
+  const st = S.steps[i]; if (!st) { $("insp").innerHTML = ""; return; }
+  $("inspLab").textContent = `Token ${i + 1}: it picked "${vis(eng.piece(st.id))}" at ${pct(st.p)}. Click another to fork.`;
+  $("insp").innerHTML = candHTML(st.top, st.id, true);
+}
+$("out").onclick = e => { const t = e.target.closest(".tok"); if (t && !S.running) inspect(+t.dataset.i); };
+$("insp").onclick = e => {
+  const b = e.target.closest(".cand"); if (!b || S.running) return;
+  const id = +b.dataset.id, st = S.steps[S.sel]; if (!st || id === st.id) return;
+  const p = st.top.find(c => c.id === id)?.p ?? 0;
+  S.steps = S.steps.slice(0, S.sel); S.steps.push({ id, top: st.top, p, forked: true, picked: !!S.game });
+  if (S.game) S.game.picks++;
+  run({ resume: true });
+};
+$("live").onclick = e => { const b = e.target.closest(".cand"); if (b && S.pickResolve) S.pickResolve(+b.dataset.id); };
+$("temp").oninput = () => $("tempV").textContent = (+$("temp").value).toFixed(2).replace(/\.?0+$/, "") || "0";
+$("btnGen").onclick = () => run({});
+$("btnStop").onclick = () => { S.stop = true; S.pickResolve?.(null); };
+
+function damaged() { return dmg.knock.size > 0 || dmg.random > 0; }
+function promptKey() { return `${$("mode").value}|${$("maxTok").value}|${$("prompt").value}`; }
+
+async function run({ resume = false }) {
+  if (!eng) return;
+  S.stop = true; S.pickResolve?.(null);
+  return lock(async () => {
+    S.stop = false; S.running = true; showErr(null);
+    $("btnGen").disabled = true; $("btnStop").disabled = false;
+    const chat = $("mode").value === "chat", temp = +$("temp").value, max = Math.max(1, +$("maxTok").value || 120);
+    const pick = $("pickMode").checked;
+    try {
+      if (!resume) {
+        const text = $("prompt").value; if (!text.trim()) throw new Error("Type a prompt first.");
+        S.prompt = eng.encodePrompt(text, chat); S.steps = []; S.sel = -1;
+        S.promptText = chat ? text.trim() + "\n\n" : text;
+        $("insp").innerHTML = ""; $("inspLab").textContent = "Click a token to inspect it";
+      }
+      let logits = await eng.start([...S.prompt, ...S.steps.map(s => s.id)]);
+      if (S.steps.length && eng.stopIds.has(S.steps.at(-1).id)) logits = null;
+      render();
+      const t0 = performance.now(); let n = 0;
+      while (logits && S.steps.length < max && !S.stop) {
+        const { top, logZ } = softmaxTop(logits, 5, 1);
+        let id, picked = false;
+        if (pick || S.game) {
+          showLive(top, -1, true);
+          id = await new Promise(res => S.pickResolve = res); S.pickResolve = null;
+          if (id === null || S.stop) break;
+          picked = true; if (S.game) S.game.picks++;
+        } else { id = sample(logits, temp); showLive(top, id); }
+        S.steps.push({ id, top, p: Math.exp(logits[id] - logZ), picked });
+        render();
+        if (S.game && checkWin()) break;
+        if (eng.stopIds.has(id)) break;
+        logits = await eng.step(id); n++;
+        if (!pick && !S.game && n % 4 === 0) $("kSpeed").textContent = (n / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
+      }
+      if (!pick && !S.game && n > 3) $("kSpeed").textContent = (n / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
+      const text = eng.decode(S.steps.map(s => s.id));
+      const clean = !S.steps.some(s => s.forked || s.picked) && temp === 0 && !S.stop;
+      if (clean && !damaged()) intact.set(promptKey(), text);
+      updateCompare(clean ? text : null);
+    } catch (e) { showErr(e); }
+    finally { S.running = false; $("btnGen").disabled = false; $("btnStop").disabled = true; if (eng) render(); }
+  });
+}
+
+function updateCompare(text) {
+  const a = intact.get(promptKey());
+  const show = damaged() && a !== undefined && text !== null;
+  $("compareWrap").hidden = !show;
+  if (show) { $("cmpA").textContent = a; $("cmpB").textContent = text; $("cmpBLab").textContent = `Damaged brain (${pct(eng.surgeon.damagedFraction(dmg))} of weights off)`; }
+}
+
+// ---------- reference loss ----------
+async function refLoss(stopFlag) {
+  const ids = eng.encodePrompt(REF_TEXT, false);
+  let logits = await eng.start(ids.slice(0, 1)), nll = 0;
+  for (let i = 1; i < ids.length; i++) {
+    if (stopFlag?.stop) return NaN;
+    nll -= logProb(logits, ids[i]);
+    if (i < ids.length - 1) logits = await eng.step(ids[i]);
+  }
+  return nll / (ids.length - 1);
+}
+function renderLoss(L) {
+  const s = Number.isFinite(L) ? L.toFixed(3) + " nats" : "–";
+  $("mLoss").textContent = s;
+  $("kLoss").textContent = Number.isFinite(L) ? L.toFixed(2) + (intactLoss != null && damaged() ? ` (${L >= intactLoss ? "+" : ""}${(L - intactLoss).toFixed(2)})` : "") : "–";
+}
+
+// ---------- surgery ----------
+function buildBrain() {
+  const L = eng.layers.length, g = $("brain");
+  g.style.gridTemplateColumns = `auto repeat(${L}, minmax(14px, 1fr))`;
+  const h = ['<span></span>', ...eng.layers.map(l => `<span class="lh">${l.i}</span>`)];
+  const r1 = ['<span class="rl">mixer</span>', ...eng.layers.map(l => `<button class="cell${l.type === "full" ? " full" : ""}" data-k="L${l.i}.mixer" title="layer ${l.i} ${l.type === "full" ? "full attention" : "linear attention"}">${l.type === "full" ? "A" : ""}</button>`)];
+  const r2 = ['<span class="rl">MLP</span>', ...eng.layers.map(l => `<button class="cell" data-k="L${l.i}.mlp" title="layer ${l.i} MLP"></button>`)];
+  g.innerHTML = [...h, ...r1, ...r2].join("");
+}
+function paintBrain() {
+  for (const c of $("brain").querySelectorAll(".cell")) c.classList.toggle("off", dmg.knock.has(c.dataset.k));
+  const f = eng ? eng.surgeon.damagedFraction(dmg) : 0;
+  $("mOff").textContent = $("kOff").textContent = pct(f);
+}
+let applyTimer = null;
+function scheduleApply() { paintBrain(); clearTimeout(applyTimer); applyTimer = setTimeout(applyDamage, 120); }
+async function applyDamage() {
+  if (!eng) return;
+  S.stop = true; S.pickResolve?.(null);
+  await lock(async () => {
+    try {
+      setStatus("editing weights…");
+      await eng.surgeon.apply(dmg);
+      const L = await refLoss(); renderLoss(L);
+      setStatus(damaged() ? `${pct(eng.surgeon.damagedFraction(dmg))} of weights off` : `${eng.name} ready`, damaged() ? "" : "on");
+    } catch (e) { showErr(e); setStatus("edit failed", "err"); }
+  });
+  if ($("autoRewrite").checked && !S.game) run({});
+}
+$("brain").onclick = e => {
+  const c = e.target.closest(".cell"); if (!c || !eng) return;
+  const k = c.dataset.k; dmg.knock.has(k) ? dmg.knock.delete(k) : dmg.knock.add(k);
+  scheduleApply();
+};
+$("rand").oninput = () => { $("randV").textContent = $("rand").value + "%"; dmg.random = +$("rand").value / 100; paintBrain(); };
+$("rand").onchange = () => scheduleApply();
+$("dmgMode").onchange = () => { dmg.mode = $("dmgMode").value; scheduleApply(); };
+$("btnReseed").onclick = () => { dmg.seed = (dmg.seed % 1000) + 1; if (dmg.random > 0) scheduleApply(); };
+$("btnRestore").onclick = () => { dmg.knock.clear(); dmg.random = 0; $("rand").value = 0; $("randV").textContent = "0%"; scheduleApply(); };
+
+// ---------- lesion scan & sweep ----------
+const scanFlag = { stop: false };
+$("btnScanStop").onclick = () => scanFlag.stop = true;
+function scanButtons(on) { $("btnScan").disabled = $("btnSweep").disabled = on; $("btnScanStop").disabled = !on; $("btnGen").disabled = on; }
+
+$("btnScan").onclick = async () => {
+  S.stop = true; S.pickResolve?.(null); scanFlag.stop = false; scanButtons(true);
+  const saved = { knock: new Set(dmg.knock), random: dmg.random, mode: dmg.mode, seed: dmg.seed };
+  const res = [];
+  try {
+    await lock(async () => {
+      await eng.surgeon.apply({});
+      const base = await refLoss(); intactLoss ??= base;
+      const jobs = eng.layers.flatMap(l => [["mixer", l.i], ["mlp", l.i]]);
+      const t0 = performance.now();
+      for (let j = 0; j < jobs.length && !scanFlag.stop; j++) {
+        const [part, i] = jobs[j];
+        await eng.surgeon.apply({ knock: new Set([`L${i}.${part}`]), mode: saved.mode });
+        const L = await refLoss(scanFlag); if (scanFlag.stop) break;
+        res.push({ layer: i, part, type: eng.layers[i].type, loss: L, delta: L - base });
+        drawScan(res, eng.layers.length);
+        const eta = (performance.now() - t0) / (j + 1) * (jobs.length - j - 1) / 1000;
+        $("scanStat").textContent = `${j + 1} / ${jobs.length}, about ${Math.ceil(eta)} s left`;
+      }
+      $("scanStat").textContent = scanFlag.stop ? "stopped" : `done. Intact loss ${base.toFixed(3)} nats.`;
+      await eng.surgeon.apply(saved);
+    });
+  } catch (e) { showErr(e); }
+  finally { scanButtons(false); }
+};
+
+function drawScan(res, nL) {
+  $("scanLegend").hidden = false; $("scanTableWrap").hidden = false;
+  const W = Math.max(420, nL * 18 + 50), H = 190, padL = 38, padB = 22, padT = 8;
+  const max = Math.max(0.1, ...res.map(r => r.delta)), min = Math.min(0, ...res.map(r => r.delta));
+  const y = v => padT + (H - padT - padB) * (1 - (v - min) / (max - min));
+  const bw = (W - padL - 4) / nL, half = Math.max(2, (bw - 4) / 2);
+  const ticks = niceTicks(min, max);
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Loss increase when each block is knocked out">`;
+  for (const t of ticks) s += `<line x1="${padL}" x2="${W - 4}" y1="${y(t)}" y2="${y(t)}" stroke="#243044" stroke-width="1"/><text x="${padL - 5}" y="${y(t) + 3.5}" fill="#8b98a9" font-size="10" text-anchor="end">${+t.toFixed(2)}</text>`;
+  for (const r of res) {
+    const x = padL + r.layer * bw + 2 + (r.part === "mlp" ? half : 0), y0 = y(0), y1 = y(r.delta);
+    const top = Math.min(y0, y1), h = Math.max(1, Math.abs(y1 - y0));
+    s += `<rect x="${x}" y="${top}" width="${Math.max(1, half - 1)}" height="${h}" rx="1.5" fill="${r.part === "mlp" ? "var(--s2)" : "var(--s1)"}" data-tip="Layer ${r.layer} ${r.part === "mlp" ? "MLP" : (r.type === "full" ? "attention" : "linear attention")} off: loss ${r.loss.toFixed(3)} (${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(3)})"/>`;
+  }
+  for (let i = 0; i < nL; i += nL > 16 ? 2 : 1) s += `<text x="${padL + i * bw + bw / 2}" y="${H - 6}" fill="#8b98a9" font-size="10" text-anchor="middle">${i}</text>`;
+  s += `<text x="${padL}" y="${H}" fill="#8b98a9" font-size="0"></text></svg>`;
+  $("scanChart").innerHTML = s + `<div class="hint">Loss increase (nats/token) by layer.</div>`;
+  const sorted = [...res].sort((a, b) => b.delta - a.delta);
+  $("scanTable").innerHTML = `<table class="t"><tr><th>block</th><th>loss</th><th>increase</th></tr>${sorted.map(r => `<tr><td>L${r.layer} ${r.part === "mlp" ? "MLP" : r.type === "full" ? "attention" : "linear attn"}</td><td class="n">${r.loss.toFixed(3)}</td><td class="n">${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(3)}</td></tr>`).join("")}</table>`;
+}
+function niceTicks(a, b) { const span = b - a, step = Math.pow(10, Math.floor(Math.log10(span / 3))); const m = [1, 2, 5, 10].find(m => span / (m * step) <= 5) * step; const out = []; for (let v = Math.ceil(a / m) * m; v <= b + 1e-9; v += m) out.push(v); return out; }
+const tip = $("tip");
+document.addEventListener("mousemove", e => { const t = e.target.closest?.("[data-tip]"); if (!t) { tip.style.display = "none"; return; } tip.textContent = t.dataset.tip; tip.style.display = "block"; tip.style.left = Math.min(innerWidth - 270, e.clientX + 12) + "px"; tip.style.top = e.clientY + 14 + "px"; });
+
+$("btnSweep").onclick = async () => {
+  S.stop = true; S.pickResolve?.(null); scanFlag.stop = false; scanButtons(true);
+  const saved = { knock: new Set(dmg.knock), random: dmg.random, mode: dmg.mode, seed: dmg.seed };
+  const levels = [0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5];
+  const prompt = "Once upon a time";
+  const rows = [];
+  try {
+    await lock(async () => {
+      for (const lv of levels) {
+        if (scanFlag.stop) break;
+        $("scanStat").textContent = `damage ${pct(lv, 0)}…`;
+        await eng.surgeon.apply({ random: lv, mode: saved.mode, seed: 1 });
+        const L = await refLoss(scanFlag); if (scanFlag.stop) break;
+        let logits = await eng.start(eng.encodePrompt(prompt, false)); const ids = [];
+        for (let i = 0; i < 24 && !scanFlag.stop; i++) { const id = sample(logits, 0); ids.push(id); if (eng.stopIds.has(id)) break; logits = await eng.step(id); }
+        rows.push({ lv, L, text: prompt + eng.decode(ids) });
+        $("sweepOut").innerHTML = `<table class="t"><tr><th>weights off</th><th>loss</th><th>greedy continuation</th></tr>${rows.map(r => `<tr><td class="n">${pct(r.lv, 0)}</td><td class="n">${r.L.toFixed(2)}</td><td>${esc(r.text)}</td></tr>`).join("")}</table>`;
+      }
+      $("scanStat").textContent = scanFlag.stop ? "stopped" : `sweep done (mode: ${saved.mode === "flip" ? "flip sign" : "set to 0"})`;
+      await eng.surgeon.apply(saved);
+    });
+  } catch (e) { showErr(e); }
+  finally { scanButtons(false); }
+};
+
+// ---------- game ----------
+let target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
+function showTarget() { $("gTarget").textContent = target; const b = store("brain.best." + target); $("gBest").textContent = b ? `${b} picks` : "–"; }
+showTarget();
+$("btnNewTarget").onclick = () => { $("gCustom").value = ""; let t; do t = TARGETS[Math.floor(Math.random() * TARGETS.length)]; while (t === target); target = t; showTarget(); };
+$("gCustom").onchange = () => { const v = $("gCustom").value.trim(); if (v) { target = v; showTarget(); } };
+$("btnGame").onclick = () => {
+  if (!eng) return;
+  S.game = { picks: 0, target };
+  $("prompt").value = GAME_PROMPT; $("mode").value = "chat"; $("maxTok").value = 60;
+  $("gMsg").textContent = "Pick tokens in the Next token list. Click an earlier token to fork (that costs a pick).";
+  $("gPicks").textContent = "0";
+  run({}).then(() => { if (S.game && !S.game.won) { $("gMsg").textContent = "Round over. Start again or fork from an earlier token."; } });
+};
+function checkWin() {
+  $("gPicks").textContent = S.game.picks;
+  const text = eng.decode(S.steps.map(s => s.id)).toLowerCase();
+  if (!text.includes(S.game.target.toLowerCase())) return false;
+  S.game.won = true;
+  const best = store("brain.best." + S.game.target);
+  if (!best || S.game.picks < best) store("brain.best." + S.game.target, S.game.picks);
+  $("gMsg").innerHTML = `<span class="win">It said "${esc(S.game.target)}" in ${S.game.picks} picks${dmg.knock.size || dmg.random ? ` with ${pct(eng.surgeon.damagedFraction(dmg))} of its weights off` : ""}.</span>`;
+  showTarget(); S.game = null; $("live").innerHTML = "";
+  return true;
+}
+$("pickMode").onchange = () => { if (!$("pickMode").checked) S.game = null; };
+$("btnStop").addEventListener("click", () => { if (S.game) { S.game = null; $("gMsg").textContent = "Round stopped."; } });
+
+if (params.has("stub")) { $("btnLoad").textContent = "Load stub model"; }
+if (params.has("autoload")) $("btnLoad").click();
+</script>
+</body>
+</html>
