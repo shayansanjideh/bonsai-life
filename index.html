@@ -91,7 +91,7 @@ table.sb tr.bonsai td{color:var(--accent);font-weight:600}
 <body>
 <div class="app">
   <div class="top">
-    <div class="brand"><h1>Bonsai Village</h1><p id="brandText">Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. The camera follows whoever it is thinking for. White bubbles are what they say; red bubbles are what they secretly think.</p></div>
+    <div class="brand"><h1>Bonsai Village</h1><p id="brandText">Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. They take turns: the world pauses while Bonsai thinks for one creature, then you see what it says (white) and secretly thinks (red).</p></div>
     <span id="status" class="status">Bonsai: loading…</span>
     <div class="controls">
       <button id="play" class="primary">Pause</button>
@@ -196,7 +196,8 @@ const rnd = Math.random;
 const clampIn = v => Math.min(1 - WALL, Math.max(WALL, v));
 const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 function makeCreature([name, personality, hue]) {
-  return { name, personality, hue, x: clampIn(0.15 + rnd() * 0.7), y: clampIn(0.15 + rnd() * 0.7), vx: 0, vy: 0, energy: 0.6 + rnd() * 0.3, alive: true,
+  const ang = (CAST.findIndex(k => k[0] === name) / CAST.length) * 6.283 + rnd() * 0.3;
+  return { name, personality, hue, x: clampIn(0.5 + Math.cos(ang) * 0.3), y: clampIn(0.5 + Math.sin(ang) * 0.3), vx: 0, vy: 0, energy: 0.6 + rnd() * 0.3, alive: true,
            action: { type: "wander", target: null }, say: "", thought: "", shownUntil: 0, memory: [], feelings: {}, lastTurn: -1e9, met: {},
            whisper: null, heading: rnd() * 6.283, touched: 0, decisions: 0, rumor: 0, last: null, brain: "bonsai", ate: 0, stole: 0, botT: 0 };
 }
@@ -234,7 +235,7 @@ function steerTo(c, tx, ty, sp) { const dx = tx - c.x, dy = ty - c.y, m = Math.h
 function tick(dt) {
   simT += dt;
   if (simT > famineUntil && food.length < FOOD_MAX && rnd() < dt * 0.45) food.push({ x: clampIn(0.1 + rnd() * 0.8), y: clampIn(0.1 + rnd() * 0.8) });
-  const SP = 0.0019 * dt * 60;
+  const SP = 0.0013 * dt * 60;
   for (const c of C) {
     if (!c.alive) continue;
     if (c.brain !== "bonsai" && (simT * 4 | 0) !== ((simT - dt) * 4 | 0)) botDecide(c);
@@ -263,7 +264,7 @@ function tick(dt) {
       }
     }
     const damp = Math.pow(0.88, dt * 60); c.vx *= damp; c.vy *= damp;
-    const vmax = 0.0019 * (a.type === "flee" || a.type === "attack" ? 1.15 : 1), v = Math.hypot(c.vx, c.vy); if (v > vmax) { c.vx *= vmax / v; c.vy *= vmax / v; }
+    const vmax = 0.0013 * (a.type === "flee" || a.type === "attack" ? 1.15 : 1), v = Math.hypot(c.vx, c.vy); if (v > vmax) { c.vx *= vmax / v; c.vy *= vmax / v; }
     c.x += c.vx * dt * 60; c.y += c.vy * dt * 60;
     if (c.x < WALL || c.x > 1 - WALL) { c.vx = -c.vx; c.heading = Math.PI - c.heading; c.x = clampIn(c.x); }
     if (c.y < WALL || c.y > 1 - WALL) { c.vy = -c.vy; c.heading = -c.heading; c.y = clampIn(c.y); }
@@ -278,7 +279,7 @@ function tick(dt) {
   }
   const live = C.filter(c => c.alive);
   for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
-    const a = live[i], b = live[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) + 1e-9, m = 0.06;
+    const a = live[i], b = live[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) + 1e-9, m = 0.13;
     if (d < m) { const push = (m - d) / 2, ux = dx / d, uy = dy / d; a.x = clampIn(a.x - ux * push); a.y = clampIn(a.y - uy * push); b.x = clampIn(b.x + ux * push); b.y = clampIn(b.y + uy * push); }
     if (d < MEET && simT - (a.met[b.name] || -99) > 12) { a.met[b.name] = b.met[a.name] = simT; trigger(a, `You just ran into ${b.name}.`, 1); trigger(b, `You just ran into ${a.name}.`, 1); }
   }
@@ -342,7 +343,7 @@ async function turnLoop() {
     let e = events.shift();
     if (!e) { const c = C.filter(c => c.alive && c.brain === "bonsai").sort((a, b) => a.lastTurn - b.lastTurn)[0]; e = { c, reason: "Nothing special is happening right now." }; }
     const c = e.c, reason = e.reason;
-    spot = { c, phase: "thinking" }; streamRaw = "";
+    spot = { c, phase: "thinking", reasonText: reason }; streamRaw = "";
     const P = buildPrompt(c, reason);
     let r = null;
     try { r = await NAT.ask(model, P.text, { maxNewTokens: 80, onToken: raw => { streamRaw = raw; } }); } catch (err) { console.warn(err); }
@@ -353,7 +354,7 @@ async function turnLoop() {
     }
     if (!spot || !C.includes(c)) { spot = null; continue; }
     spot.phase = "acting";
-    await sleep(mode === "arena" ? 250 : (model.stub ? 500 : 1100));   // hold the camera on the result
+    await sleep(mode === "arena" ? 250 : 2600);   // let the result play out before the next turn
     spot = null;
   }
 }
@@ -385,12 +386,12 @@ function draw(dtReal) {
   for (const f of food) { ctx.beginPath(); ctx.arc(f.x * S, f.y * S, Math.max(3, S / 170), 0, 6.283); ctx.fill(); }
   const r = Math.max(10, S / 40);
   // relationship web
-  for (const a of C) { if (!a.alive) continue; for (const [nm, v] of Object.entries(a.feelings)) { const b = byName(nm); if (!b || Math.abs(v) < 1) continue;
+  for (const a of C) { if (!a.alive || (mode !== "arena" && spot && a !== spot.c) || (mode !== "arena" && !spot)) continue; for (const [nm, v] of Object.entries(a.feelings)) { const b = byName(nm); if (!b || Math.abs(v) < 1) continue;
     const mx = (a.x + b.x) / 2 * S - (b.y - a.y) * S * 0.12, my = (a.y + b.y) / 2 * S + (b.x - a.x) * S * 0.12;
     ctx.strokeStyle = v > 0 ? `rgba(77,255,225,${0.12 + Math.abs(v) * 0.08})` : `rgba(255,92,122,${0.12 + Math.abs(v) * 0.08})`; ctx.lineWidth = (1 + Math.abs(v) * 0.5) * u;
     ctx.beginPath(); ctx.moveTo(a.x * S, a.y * S); ctx.quadraticCurveTo(mx, my, b.x * S, b.y * S); ctx.stroke(); } }
   // intent arrows
-  for (const c of C) { if (!c.alive || !c.action.target) continue; const T = byName(c.action.target); if (!T) continue;
+  for (const c of C) { if (!c.alive || !c.action.target || (mode !== "arena" && spot && c !== spot.c)) continue; const T = byName(c.action.target); if (!T) continue;
     ctx.strokeStyle = ACOL[c.action.type] || "#888"; ctx.lineWidth = 2.5 * u; ctx.setLineDash(c.action.type === "follow" ? [8 * u, 8 * u] : []);
     const ang = Math.atan2(T.y - c.y, T.x - c.x), ex = T.x * S - Math.cos(ang) * r * 1.4, ey = T.y * S - Math.sin(ang) * r * 1.4;
     ctx.beginPath(); ctx.moveTo(c.x * S, c.y * S); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
@@ -417,10 +418,25 @@ function draw(dtReal) {
     g.addColorStop(0, "rgba(5,8,12,0)"); g.addColorStop(1, "rgba(5,8,12,.55)"); ctx.fillStyle = g; ctx.fillRect(-S, -S, S * 3, S * 3);
     if (spot.phase === "thinking") { const p = (performance.now() / 600) % 1; ctx.strokeStyle = `rgba(77,255,136,${1 - p})`; ctx.lineWidth = 3 * u; ctx.beginPath(); ctx.arc(x, y, r * (1.4 + p * 1.2), 0, 6.283); ctx.stroke(); }
   }
-  const speakers = C.filter(c => c.alive && simT < c.shownUntil && (c.say || c.thought)).sort((a, b) => (a === spot?.c) - (b === spot?.c));
-  for (const c of speakers.slice(-3)) bubbles(c, r, u);
+  const onStage = mode === "arena" ? C.filter(c => c.alive && simT < c.shownUntil && (c.say || c.thought)).slice(-1) : (spot && spot.phase === "acting" && spot.c.alive ? [spot.c] : []);
+  for (const c of onStage) bubbles(c, r, u);
   if (spot && spot.phase === "thinking" && spot.c.alive) codeStrip(spot.c, r, u);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (mode !== "arena" && spot && spot.c.alive) caption(spot);
+}
+function caption(sp) {
+  const c = sp.c, L = c.last, fs = Math.max(13, S / 52);
+  const role = c.personality.split(/[:,]/)[0].replace(/^an? /, "");
+  let line1 = `${c.name}, ${role}`, line2;
+  if (sp.phase === "thinking") line2 = `Bonsai is deciding for ${c.name}… (${(sp.reasonText || "").replace(/^You (just )?/, "").slice(0, 70)})`;
+  else if (L) line2 = `→ ${L.action === "eat" ? "goes to eat" : L.action === "rest" ? "rests" : L.action === "wander" ? "wanders" : L.action + " " + (c.action.target || "")}`;
+  else line2 = "";
+  ctx.font = `700 ${fs}px ui-sans-serif,system-ui,sans-serif`; const w1 = ctx.measureText(line1).width;
+  ctx.font = `${fs}px ui-sans-serif,system-ui,sans-serif`; const w2 = ctx.measureText(line2).width;
+  const w = Math.min(S - 24, Math.max(w1, w2) + fs * 1.6), h = fs * 3.2, x = (S - w) / 2, y = S - h - 12;
+  ctx.fillStyle = "rgba(17,23,34,.92)"; ctx.strokeStyle = col(c); ctx.lineWidth = 2; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+  ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = col(c); ctx.font = `700 ${fs}px ui-sans-serif,system-ui,sans-serif`; ctx.fillText(line1, S / 2, y + fs * 0.35);
+  ctx.fillStyle = "#e6edf3"; ctx.font = `${fs}px ui-sans-serif,system-ui,sans-serif`; ctx.fillText(line2, S / 2, y + fs * 1.65);
 }
 function wrapLines(text, maxW) { const words = text.split(/\s+/), lines = []; let line = ""; for (const w of words) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines.slice(0, 3); }
 function box(x, yBottom, text, fsz, bg, fg, border, italic) {
@@ -590,7 +606,7 @@ async function wake() {
 let lastFrame = performance.now(), panelT = 0;
 function frame(t) {
   const dtReal = Math.min(0.05, (t - lastFrame) / 1000); lastFrame = t;
-  const slow = spot ? 0.5 : 1;   // slow motion while Bonsai thinks, so the moment it's reacting to stays on screen
+  const slow = mode === "arena" ? (spot ? 0.5 : 1) : (spot && spot.phase === "thinking" ? 0 : 0.7);   // village is turn-based: the world holds still while Bonsai thinks
   if (running && !frozen && model) { tick(dtReal * slow); arenaTick(dtReal * slow); }
   draw(dtReal);
   if (t - panelT > 400) {
