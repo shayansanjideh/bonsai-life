@@ -556,6 +556,15 @@ function stubModel() {   // ?stub=1: a fake model for testing the UI without a G
 }
 async function wake() {
   const st = $("status");
+  const llama = new URLSearchParams(location.search).get("llama");
+  if (llama) {   // ?llama=http://host:port : the same Bonsai 2B weights served by PrismML's llama.cpp (used for automated tests); labeled
+    model = { llama: true }; NAT = { ask: async (m, prompt, o = {}) => {
+      const t = performance.now();
+      const r = await fetch(llama + "/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: prompt }], max_tokens: o.maxNewTokens || 80, temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.5, chat_template_kwargs: { enable_thinking: false } }) });
+      const j = await r.json(), raw = j.choices[0].message.content || "", ms = performance.now() - t, tokens = j.usage?.completion_tokens || 0;
+      o.onToken?.(raw); return { raw, ms, tokens, tps: tokens / (ms / 1000) }; } };
+    $("veil").hidden = true; st.textContent = "Bonsai 2B via llama.cpp (test mode)"; st.className = "status on"; return true;
+  }
   if (new URLSearchParams(location.search).has("stub")) { const s = stubModel(); NAT = { ask: (m, p, o) => s.ask(p, o) }; model = s; $("veil").hidden = true; st.textContent = "STUB model (test mode, not Bonsai)"; return true; }
   if (!navigator.gpu) {
     $("veilTitle").textContent = "This browser can't run Bonsai";
