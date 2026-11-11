@@ -601,7 +601,7 @@ function frame(t) {
   }
   requestAnimationFrame(frame);
 }
-window.BV = { get C() { return C; }, get stats() { return stats; }, buildPrompt, parseDecision, get picks() { return { picks, firstPicks, totalPicks }; } };
+window.BV = { get C() { return C; }, get stats() { return stats; }, select: n => { selected = byName(n) || selected; renderMind(); }, buildPrompt, parseDecision, get picks() { return { picks, firstPicks, totalPicks }; } };
 resize(); newVillage(); requestAnimationFrame(frame); wake().then(ok => { if (ok) turnLoop(); });
 </script>
 </body>
