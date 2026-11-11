@@ -90,7 +90,7 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
         <button id="scramble" title="Replace every brain with a random one. Lineages stay; what they learned is gone.">Scramble all brains</button>
         <button id="reset">New dish</button>
       </div>
-      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="0" max="6" value="1"> <span id="speedv">1×</span></label>
+      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="0" max="6" value="2"> <span id="speedv">2×</span></label>
     </div>
 
     <div class="card">
@@ -386,7 +386,7 @@ function note({ text, title, source, extra }) {
   const f = $("feed"); f.prepend(e); while (f.children.length > 40) f.lastChild.remove();
 }
 
-const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 1, acc = 0;
+const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 2, acc = 0;
 $("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
 $("speed").oninput = e => { speed = SPEEDS[+e.target.value]; $("speedv").textContent = speed + "×"; };
 $("reset").onclick = () => newDish();
