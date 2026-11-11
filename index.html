@@ -286,11 +286,11 @@ async function writeNewborn(a, b, g, muts) {
 Parent ${a.name}: ${bodyWords(a.g)}; personality: "${a.personality}"
 Parent ${b.name}: ${bodyWords(b.g)}; personality: "${b.personality}"
 The baby's body: ${bodyWords(g)}.${muts.length ? ` Unlike its parents, it was born with ${muts.join(" and ")}.` : ""}
-Give the baby a short, cute, made-up name (one word, 2-3 syllables, not one of: ${used}) and a personality: a phrase starting with "a", under 14 words, that mixes its parents' personalities and fits its new body.
+Give the baby a short, cute, made-up name (one word, 2-3 syllables, not one of: ${used}) and a personality: a phrase starting with "a", under 10 words, that mixes its parents' personalities and fits its new body.
 Reply with only JSON: {"name": "...", "personality": "..."}`, 70);
   const o = r && parseJSON(r.raw); if (!o) return null;
   let name = String(o.name || "").replace(/[^A-Za-z]/g, "").slice(0, 10); if (!name || C.some(c => c.name.toLowerCase() === name.toLowerCase())) name = fallbackName(); else name = name[0].toUpperCase() + name.slice(1).toLowerCase();
-  return { name, personality: String(o.personality || "").split(/\s+/).slice(0, 14).join(" ").replace(/[,;]$/, "") };
+  return { name, personality: String(o.personality || "").split(/\s+/).slice(0, 18).join(" ").replace(/[,;]$/, "") };
 }
 async function founders() {
   C.forEach(c => scene.remove(c.mesh)); C = []; eggs.forEach(e => scene.remove(e.mesh)); eggs = []; simT = 0; nextId = 1; $("feed").innerHTML = ""; started = false;
