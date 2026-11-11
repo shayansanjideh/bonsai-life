@@ -69,7 +69,7 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
 
   <main>
     <div class="stage"><canvas id="cv"></canvas><canvas id="ov" style="pointer-events:none"></canvas></div>
-    <div class="hint">Colors are lineages: every cell starts with its own random brain, and colors merge as winning brains spread. Pale specks are food. Click any cell to see its brain think.</div>
+    <div class="hint">Colors are lineages. Eight species start with random brains; the ones that find food spread, and new shades appear when a mutation founds a sub-species. Pale specks are food. Click any cell to see its brain think.</div>
   </main>
 
   <aside>
@@ -90,7 +90,7 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
         <button id="scramble" title="Replace every brain with a random one. Lineages stay; what they learned is gone.">Scramble all brains</button>
         <button id="reset">New dish</button>
       </div>
-      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="1" max="8" value="3"> <span id="speedv">3×</span></label>
+      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="0" max="6" value="1"> <span id="speedv">1×</span></label>
     </div>
 
     <div class="card">
@@ -118,9 +118,9 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
 <script>
 "use strict";
 // ======================= world =======================
-const MAXC = 1600, MAXF = 900, START = 500;
+const MAXC = 260, MAXF = 220, START = 64, SPECIES = 8;
 const NI = 10, NH = 6, NO = 2, NW = NI * NH + NH * NO + NO;      // 74 numbers per brain
-const SENSE = 0.09, CROWD = 0.035, EAT = 0.009, GRID = 11;          // GRID cells of size >= SENSE
+const SENSE = 0.12, CROWD = 0.05, EAT = 0.016, GRID = 8;          // GRID cells of size >= SENSE
 const IN_LABELS = ["food →", "food ↓", "food near", "crowd →", "crowd ↓", "kin nearby", "energy", "my vel →", "my vel ↓", "bias"];
 const OUT_LABELS = ["push →", "push ↓"];
 
@@ -143,7 +143,8 @@ const lineages = new Map();   // id -> {hue, born, name, aiName, peak}
 let foodEvents = 0, aimSum = 0, aimN = 0; const history = []; const marks = [];
 let selectedUid = 0, followLin = 0, followNote = false;
 
-function newLineage() { const id = nextLin++; lineages.set(id, { id, hue: (id * 137.508) % 360, born: steps, name: latinName(id), aiName: null }); return id; }
+const HUES = [0, 30, 55, 120, 175, 210, 270, 315];
+function newLineage(parent) { const id = nextLin++, P = parent && lineages.get(parent); lineages.set(id, { id, parent: P ? parent : 0, hue: P ? (P.hue + (rnd() < .5 ? -1 : 1) * (18 + rnd() * 30) + 360) % 360 : id <= HUES.length ? HUES[id - 1] : (id * 137.508) % 360, born: steps, name: latinName(id), aiName: null }); return id; }
 function addCell(x, y, e, l, g, parent) {
   if (n >= MAXC) return -1;
   const i = n++; cx[i] = x; cy[i] = y; cvx[i] = 0; cvy[i] = 0; energy[i] = e; age[i] = 0; gen[i] = g; lin[i] = l; eaten[i] = 0; kids[i] = 0; uid[i] = nextUid++;
@@ -163,10 +164,13 @@ function removeFood(k) { nf--; fx[k] = fx[nf]; fy[k] = fy[nf]; }
 
 function newDish() {
   n = 0; nf = 0; steps = 0; lineages.clear(); history.length = 0; marks.length = 0; selectedUid = 0;
-  for (let i = 0; i < START; i++) addCell(rnd(), rnd(), 0.6 + rnd() * 0.3, newLineage(), 0, -1);
-  for (let i = 0; i < 500; i++) addFood(rnd(), rnd());
+  for (let s = 0; s < SPECIES; s++) {
+    const l = newLineage(), f = addCell(rnd(), rnd(), 0.8, l, 0, -1);
+    for (let i = 1; i < START / SPECIES; i++) addCell(rnd(), rnd(), 0.6 + rnd() * 0.3, l, 0, f);
+  }
+  for (let i = 0; i < 120; i++) addFood(rnd(), rnd());
   document.getElementById("feed").innerHTML = "";
-  note({ text: `New dish: ${START} cells, each with its own random ${NW}-number brain. None of them know how to find food yet.`, source: "sim" });
+  note({ text: `New dish: ${SPECIES} species, ${START} cells. Each cell has its own ${NW}-number brain; each species starts from one random brain. None of them know how to find food yet.`, source: "sim" });
 }
 
 // ======================= brains =======================
@@ -211,12 +215,13 @@ function sense(i, inp) {
 }
 
 // ======================= step =======================
-const ACC = 0.00045, DAMP = 0.86, MAXV = 0.006;
+const ACC = 0.00022, DAMP = 0.86, MAXV = 0.0028;
 function step() {
   steps++;
   // food: blooms drift; most food appears near them, some anywhere
   for (const b of blooms) { b.x = (b.x + b.vx + 1) % 1; b.y = (b.y + b.vy + 1) % 1; if (rnd() < 0.002) { b.vx = (rnd() - .5) * 2e-4; b.vy = (rnd() - .5) * 2e-4; } }
-  for (let s = 0; s < 5; s++) {
+  for (let s = 0; s < 1; s++) {
+    if (rnd() > 0.8) continue;
     if (rnd() < 0.8) { const b = blooms[(rnd() * 3) | 0]; addFood(b.x + gauss() * 0.06, b.y + gauss() * 0.06); }
     else addFood(rnd(), rnd());
   }
@@ -230,7 +235,7 @@ function step() {
     if (inBuf[2] >= 0) { /* noop: crowding handled through sensing; keep it cheap */ }
     const sp = Math.hypot(cvx[i], cvy[i]); if (sp > MAXV) { cvx[i] *= MAXV / sp; cvy[i] *= MAXV / sp; }
     cx[i] = (cx[i] + cvx[i] + 1) % 1; cy[i] = (cy[i] + cvy[i] + 1) % 1;
-    energy[i] -= 0.0011 + 0.0016 * (tx * tx + ty * ty);
+    energy[i] -= 0.0012 + 0.0012 * (tx * tx + ty * ty);
     age[i]++;
   }
   // eating (one pass over food near each cell)
@@ -248,12 +253,12 @@ function step() {
     if (energy[i] <= 0 || age[i] > 9000) { if (rnd() < 0.5) addFood(cx[i], cy[i]); removeCell(i); continue; }
     if (energy[i] > 1.2 && n < MAXC) {
       energy[i] *= 0.5; kids[i]++;
-      const l = rnd() < 0.01 ? newLineage() : lin[i];
+      const l = rnd() < 0.03 ? newLineage(lin[i]) : lin[i];
       addCell(cx[i] + (rnd() - .5) * 0.01, cy[i] + (rnd() - .5) * 0.01, energy[i], l, gen[i] + 1, i);
     }
   }
   // keep the dish from dying out entirely
-  if (n < 40) for (let i = 0; i < 40; i++) addCell(rnd(), rnd(), 0.7, newLineage(), 0, -1);
+  if (n < 12) for (let i = 0; i < 12; i++) addCell(rnd(), rnd(), 0.7, newLineage(), 0, -1);
   if (steps % 120 === 0) sample();
 }
 
@@ -286,10 +291,10 @@ let S = 800;
 function resize() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); S = Math.max(200, Math.round(Math.min(r.width, r.height) * d)); cv.width = S; cv.height = S; ov.width = S; ov.height = S; }
 addEventListener("resize", resize);
 function draw() {
-  ctx.fillStyle = "rgba(10,14,20,0.35)"; ctx.fillRect(0, 0, S, S);
-  ctx.fillStyle = "rgba(255,244,214,0.8)"; const fs = Math.max(1.5, S / 450);
+  ctx.fillStyle = "rgba(10,14,20,0.6)"; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = "rgba(255,244,214,0.8)"; const fs = Math.max(2.5, S / 220);
   for (let k = 0; k < nf; k++) ctx.fillRect(fx[k] * S - fs / 2, fy[k] * S - fs / 2, fs, fs);
-  const r = Math.max(2, S / 260); octx.clearRect(0, 0, S, S);
+  const r = Math.max(3.5, S / 120); octx.clearRect(0, 0, S, S);
   let sel = -1;
   for (let i = 0; i < n; i++) {
     if (uid[i] === selectedUid) sel = i;
@@ -381,9 +386,9 @@ function note({ text, title, source, extra }) {
   const f = $("feed"); f.prepend(e); while (f.children.length > 40) f.lastChild.remove();
 }
 
-let running = true, speed = 3;
+const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 1, acc = 0;
 $("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
-$("speed").oninput = e => { speed = +e.target.value; $("speedv").textContent = speed + "×"; };
+$("speed").oninput = e => { speed = SPEEDS[+e.target.value]; $("speedv").textContent = speed + "×"; };
 $("reset").onclick = () => newDish();
 $("scramble").onclick = () => {
   for (let k = 0; k < n * NW; k++) W[k] = gauss() * 0.8;
@@ -452,7 +457,7 @@ else { try { if (localStorage.getItem("bonsai-cells-wake") === "1") wake(); } ca
 // ======================= loop =======================
 let fpsT = performance.now(), panelT = 0;
 function frame(now) {
-  if (running) for (let k = 0; k < speed; k++) step();
+  if (running) { acc += speed; while (acc >= 1) { step(); acc -= 1; } }
   const sel = draw();
   if (now - panelT > 250) { panelT = now; updatePanels(); drawSpark(); }
   drawBrain(sel);
