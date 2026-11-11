@@ -36,7 +36,11 @@ canvas.spark{width:100%;height:64px;display:block;margin-top:8px}
 .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:4px}
 .legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .lineages{display:flex;flex-direction:column;gap:4px;margin-top:4px}
-.lin{display:grid;grid-template-columns:12px minmax(0,1fr) 46px;gap:8px;align-items:center;font-size:12px}
+.lin{display:grid;grid-template-columns:12px minmax(0,1fr) 34px;gap:8px;align-items:start;font-size:12px}
+.lin .sw{margin-top:3px}
+.lin .why{color:var(--muted);font-size:11px}
+.lin.dead{opacity:.45}
+.lin .facts{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
 .lin .sw{width:12px;height:12px;border-radius:50%}
 .lin .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lin .nm em{color:var(--text)}
@@ -62,14 +66,14 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
 <div class="app">
   <header>
     <h1>Bonsai-Life</h1>
-    <span class="sub">Every cell runs its own tiny neural network. Brains that find food get passed on, with mutations.</span>
+    <span class="sub">Every cell runs its own tiny neural network. Eight species with different personalities compete for food; brains that work get passed on, with mutations.</span>
     <a href="breeder.html">Matrix breeder →</a>
     <span id="status" class="status">narrator: offline</span>
   </header>
 
   <main>
     <div class="stage"><canvas id="cv"></canvas><canvas id="ov" style="pointer-events:none"></canvas></div>
-    <div class="hint">Colors are lineages. Eight species start with random brains; the ones that find food spread, and new shades appear when a mutation founds a sub-species. Pale specks are food. Click any cell to see its brain think.</div>
+    <div class="hint">Each color is a species with its own personality (see the list on the right). Pale specks are food. The box is a solid wall. Click any cell to see its brain think.</div>
   </main>
 
   <aside>
@@ -77,7 +81,7 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
       <h2>Evolution</h2>
       <div class="stats">
         <div class="stat"><div class="k">Cells</div><div class="v" id="sPop">–</div></div>
-        <div class="stat"><div class="k">Lineages alive</div><div class="v" id="sLin">–</div></div>
+        <div class="stat"><div class="k">Species alive</div><div class="v" id="sLin">–</div></div>
         <div class="stat"><div class="k">Deepest generation</div><div class="v" id="sGen">–</div></div>
         <div class="stat"><div class="k">Food per cell / min</div><div class="v" id="sFood">–</div></div>
         <div class="stat"><div class="k">Steers toward food</div><div class="v" id="sAim">–</div></div>
@@ -90,7 +94,7 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
         <button id="scramble" title="Replace every brain with a random one. Lineages stay; what they learned is gone.">Scramble all brains</button>
         <button id="reset">New dish</button>
       </div>
-      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="0" max="6" value="2"> <span id="speedv">2×</span></label>
+      <label class="sl" style="margin-top:8px">Speed <input id="speed" type="range" min="0" max="6" value="1"> <span id="speedv">1×</span></label>
     </div>
 
     <div class="card">
@@ -101,8 +105,9 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
     </div>
 
     <div class="card">
-      <h2>Leading lineages</h2>
+      <h2>Species and personalities</h2>
       <div class="lineages" id="lineages"></div>
+      <p class="small" style="margin-top:8px">Lines in the dish: <span style="color:#ff4d6d">red</span> = a Hunter bite, <span style="color:#4dffe1">teal</span> = a Sharer feeding a relative, <span style="color:#c08bff">purple</span> = a Scavenger eating the dead.</p>
     </div>
 
     <div class="card">
@@ -120,8 +125,8 @@ label.sl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute
 // ======================= world =======================
 const MAXC = 260, MAXF = 220, START = 64, SPECIES = 8;
 const NI = 10, NH = 6, NO = 2, NW = NI * NH + NH * NO + NO;      // 74 numbers per brain
-const SENSE = 0.12, CROWD = 0.05, EAT = 0.016, GRID = 8;          // GRID cells of size >= SENSE
-const IN_LABELS = ["food →", "food ↓", "food near", "crowd →", "crowd ↓", "kin nearby", "energy", "my vel →", "my vel ↓", "bias"];
+const SENSE = 0.12, CROWD = 0.05, EAT = 0.016, GRID = 8, TOUCH = 0.016, WALL = 0.012;          // GRID cells of size >= SENSE
+const IN_LABELS = ["food →", "food ↓", "food near", "crowd →", "crowd ↓", "kin nearby", "energy", "wall →", "wall ↓", "bias"];
 const OUT_LABELS = ["push →", "push ↓"];
 
 let rnd = mulberry(Date.now() & 0xffffffff);
@@ -134,6 +139,22 @@ const energy = new Float32Array(MAXC), age = new Uint32Array(MAXC), gen = new Ui
 const eaten = new Uint32Array(MAXC), kids = new Uint32Array(MAXC), uid = new Uint32Array(MAXC);
 const W = new Float32Array(MAXC * NW);
 let n = 0, nextUid = 1, nextLin = 1, steps = 0;
+const lastBit = new Uint32Array(MAXC);
+// Personalities: fixed body traits per species. Brains still evolve inside each species.
+const P = [
+  { key: "Hunter",    hue: 0,   blurb: "bites other species on contact to steal energy; burns energy faster", base: 1.3, bite: true },
+  { key: "Sprinter",  hue: 30,  blurb: "moves 1.6× faster but movement costs twice as much", speed: 1.6, move: 2 },
+  { key: "Herder",    hue: 55,  blurb: "thrives near its own kind, struggles alone", herd: true },
+  { key: "Loner",     hue: 120, blurb: "cheap to run alone, stressed by any neighbor", loner: true },
+  { key: "Sharer",    hue: 175, blurb: "feeds hungry relatives when it has energy to spare", share: true },
+  { key: "Grazer",    hue: 210, blurb: "eats from a wider reach but moves slowly", eat: 1.7, speed: 0.7 },
+  { key: "Scavenger", hue: 270, blurb: "feeds on cells that die nearby", base: 0.9, scav: true },
+  { key: "Breeder",   hue: 315, blurb: "divides early and often, but lives shorter", divide: 1.0, life: 0.6 },
+];
+const pers = l => P[(l - 1) % P.length];
+const SPS = P.map(() => ({}));   // per-species counters
+function resetSpeciesStats() { for (let k = 0; k < P.length; k++) SPS[k] = { births: 0, starved: 0, eaten: 0, old: 0, lifeSum: 0, deaths: 0, bites: 0, shares: 0, scav: 0, extinctAt: 0 }; }
+const flashes = [];   // interaction lines drawn on the overlay
 // food
 const fx = new Float32Array(MAXF), fy = new Float32Array(MAXF); let nf = 0;
 const blooms = [0, 1, 2].map(() => ({ x: rnd(), y: rnd(), vx: (rnd() - .5) * 2e-4, vy: (rnd() - .5) * 2e-4 }));
@@ -144,10 +165,10 @@ let foodEvents = 0, aimSum = 0, aimN = 0; const history = []; const marks = [];
 let selectedUid = 0, followLin = 0, followNote = false;
 
 const HUES = [0, 30, 55, 120, 175, 210, 270, 315];
-function newLineage(parent) { const id = nextLin++, P = parent && lineages.get(parent); lineages.set(id, { id, parent: P ? parent : 0, hue: P ? (P.hue + (rnd() < .5 ? -1 : 1) * (18 + rnd() * 30) + 360) % 360 : id <= HUES.length ? HUES[id - 1] : (id * 137.508) % 360, born: steps, name: latinName(id), aiName: null }); return id; }
+function newLineage() { const id = nextLin++; lineages.set(id, { id, hue: pers(id).hue, born: steps, name: latinName(id), aiName: null }); return id; }
 function addCell(x, y, e, l, g, parent) {
   if (n >= MAXC) return -1;
-  const i = n++; cx[i] = x; cy[i] = y; cvx[i] = 0; cvy[i] = 0; energy[i] = e; age[i] = 0; gen[i] = g; lin[i] = l; eaten[i] = 0; kids[i] = 0; uid[i] = nextUid++;
+  const i = n++; lastBit[i] = 0; x = clampIn(x); y = clampIn(y); cx[i] = x; cy[i] = y; cvx[i] = 0; cvy[i] = 0; energy[i] = e; age[i] = 0; gen[i] = g; lin[i] = l; eaten[i] = 0; kids[i] = 0; uid[i] = nextUid++;
   const o = i * NW;
   if (parent >= 0) { const p = parent * NW; for (let k = 0; k < NW; k++) W[o + k] = W[p + k] + (rnd() < 0.25 ? gauss() * 0.25 : 0); }
   else for (let k = 0; k < NW; k++) W[o + k] = gauss() * 0.8;
@@ -156,21 +177,22 @@ function addCell(x, y, e, l, g, parent) {
 function removeCell(i) {
   const j = --n; if (i === j) return;
   cx[i] = cx[j]; cy[i] = cy[j]; cvx[i] = cvx[j]; cvy[i] = cvy[j]; energy[i] = energy[j]; age[i] = age[j]; gen[i] = gen[j];
-  lin[i] = lin[j]; eaten[i] = eaten[j]; kids[i] = kids[j]; uid[i] = uid[j];
+  lin[i] = lin[j]; eaten[i] = eaten[j]; kids[i] = kids[j]; uid[i] = uid[j]; lastBit[i] = lastBit[j];
   W.copyWithin(i * NW, j * NW, j * NW + NW);
 }
-function addFood(x, y) { if (nf >= MAXF) return; fx[nf] = ((x % 1) + 1) % 1; fy[nf] = ((y % 1) + 1) % 1; nf++; }
+const clampIn = v => Math.min(1 - WALL, Math.max(WALL, v));
+function addFood(x, y) { if (nf >= MAXF) return; fx[nf] = clampIn(x); fy[nf] = clampIn(y); nf++; }
 function removeFood(k) { nf--; fx[k] = fx[nf]; fy[k] = fy[nf]; }
 
 function newDish() {
-  n = 0; nf = 0; steps = 0; lineages.clear(); history.length = 0; marks.length = 0; selectedUid = 0;
+  n = 0; nf = 0; steps = 0; nextLin = 1; lineages.clear(); history.length = 0; marks.length = 0; selectedUid = 0; flashes.length = 0; resetSpeciesStats();
   for (let s = 0; s < SPECIES; s++) {
-    const l = newLineage(), f = addCell(rnd(), rnd(), 0.8, l, 0, -1);
-    for (let i = 1; i < START / SPECIES; i++) addCell(rnd(), rnd(), 0.6 + rnd() * 0.3, l, 0, f);
+    const l = newLineage(), f = addCell(rnd(), rnd(), 1.0, l, 0, -1);
+    for (let i = 1; i < START / SPECIES; i++) addCell(rnd(), rnd(), 0.9 + rnd() * 0.2, l, 0, f);
   }
   for (let i = 0; i < 120; i++) addFood(rnd(), rnd());
   document.getElementById("feed").innerHTML = "";
-  note({ text: `New dish: ${SPECIES} species, ${START} cells. Each cell has its own ${NW}-number brain; each species starts from one random brain. None of them know how to find food yet.`, source: "sim" });
+  note({ text: `New dish: ${SPECIES} species with different personalities, ${START} cells. Every cell has its own ${NW}-number brain; each species starts from one random brain, so none of them know how to find food yet.`, source: "sim" });
 }
 
 // ======================= brains =======================
@@ -184,19 +206,21 @@ function think(i, inp, hid, out) {
 
 // spatial hash for cells and food
 const cHead = new Int32Array(GRID * GRID), cNext = new Int32Array(MAXC), fHead = new Int32Array(GRID * GRID), fNext = new Int32Array(MAXF);
-const cellOf = (x, y) => (Math.floor(x * GRID) % GRID) * GRID + (Math.floor(y * GRID) % GRID);
+const gIdx = v => Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
+const cellOf = (x, y) => gIdx(x) * GRID + gIdx(y);
 function rebin() {
   cHead.fill(-1); fHead.fill(-1);
   for (let i = 0; i < n; i++) { const c = cellOf(cx[i], cy[i]); cNext[i] = cHead[c]; cHead[c] = i; }
   for (let k = 0; k < nf; k++) { const c = cellOf(fx[k], fy[k]); fNext[k] = fHead[c]; fHead[c] = k; }
 }
-const wrap = d => d - Math.round(d);
+const wrap = d => d;   // solid walls: no wrap-around
 
 function sense(i, inp) {
-  const gx = Math.floor(cx[i] * GRID), gy = Math.floor(cy[i] * GRID);
+  const gx = gIdx(cx[i]), gy = gIdx(cy[i]);
   let best = 1e9, bdx = 0, bdy = 0, crx = 0, cry = 0, cn = 0, kin = 0;
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-    const c = ((gx + dx + GRID) % GRID) * GRID + ((gy + dy + GRID) % GRID);
+    const ax = gx + dx, ay = gy + dy; if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) continue;
+    const c = ax * GRID + ay;
     for (let k = fHead[c]; k !== -1; k = fNext[k]) {
       const ddx = wrap(fx[k] - cx[i]), ddy = wrap(fy[k] - cy[i]), d2 = ddx * ddx + ddy * ddy;
       if (d2 < best) { best = d2; bdx = ddx; bdy = ddy; }
@@ -210,16 +234,18 @@ function sense(i, inp) {
   const d = Math.sqrt(best);
   if (d < SENSE) { inp[0] = bdx / (d + 1e-6); inp[1] = bdy / (d + 1e-6); inp[2] = 1 - d / SENSE; } else { inp[0] = 0; inp[1] = 0; inp[2] = 0; }
   if (cn) { const m = Math.hypot(crx, cry) + 1e-6; inp[3] = crx / m; inp[4] = cry / m; inp[5] = kin / cn; } else { inp[3] = 0; inp[4] = 0; inp[5] = 0; }
-  inp[6] = Math.min(1.5, energy[i]) / 1.5; inp[7] = cvx[i] * 250; inp[8] = cvy[i] * 250; inp[9] = 1;
+  const wf = v => Math.max(0, 1 - v / SENSE);
+  inp[6] = Math.min(1.5, energy[i]) / 1.5; inp[7] = wf(1 - cx[i]) - wf(cx[i]); inp[8] = wf(1 - cy[i]) - wf(cy[i]); inp[9] = 1;
+  sense.cn = cn; sense.kin = kin;
   return d < SENSE;
 }
 
 // ======================= step =======================
-const ACC = 0.00022, DAMP = 0.86, MAXV = 0.0028;
+const ACC = 0.00014, DAMP = 0.86, MAXV = 0.0018;
 function step() {
   steps++;
   // food: blooms drift; most food appears near them, some anywhere
-  for (const b of blooms) { b.x = (b.x + b.vx + 1) % 1; b.y = (b.y + b.vy + 1) % 1; if (rnd() < 0.002) { b.vx = (rnd() - .5) * 2e-4; b.vy = (rnd() - .5) * 2e-4; } }
+  for (const b of blooms) { b.x += b.vx; b.y += b.vy; if (b.x < .15 || b.x > .85) b.vx = -b.vx; if (b.y < .15 || b.y > .85) b.vy = -b.vy; if (rnd() < 0.002) { b.vx = (rnd() - .5) * 2e-4; b.vy = (rnd() - .5) * 2e-4; } }
   for (let s = 0; s < 1; s++) {
     if (rnd() > 0.8) continue;
     if (rnd() < 0.8) { const b = blooms[(rnd() * 3) | 0]; addFood(b.x + gauss() * 0.06, b.y + gauss() * 0.06); }
@@ -230,38 +256,88 @@ function step() {
     const sees = sense(i, inBuf); think(i, inBuf, hidBuf, outBuf);
     const tx = outBuf[0], ty = outBuf[1];
     if (sees) { const m = Math.hypot(tx, ty); if (m > 0.05) { aimSum += (tx * inBuf[0] + ty * inBuf[1]) / m; aimN++; } }
-    cvx[i] = cvx[i] * DAMP + tx * ACC; cvy[i] = cvy[i] * DAMP + ty * ACC;
-    // soft personal space so cells don't stack
-    if (inBuf[2] >= 0) { /* noop: crowding handled through sensing; keep it cheap */ }
-    const sp = Math.hypot(cvx[i], cvy[i]); if (sp > MAXV) { cvx[i] *= MAXV / sp; cvy[i] *= MAXV / sp; }
-    cx[i] = (cx[i] + cvx[i] + 1) % 1; cy[i] = (cy[i] + cvy[i] + 1) % 1;
-    energy[i] -= 0.0012 + 0.0012 * (tx * tx + ty * ty);
+    const pp = pers(lin[i]), vmax = MAXV * (pp.speed || 1);
+    cvx[i] = cvx[i] * DAMP + tx * ACC * (pp.speed || 1); cvy[i] = cvy[i] * DAMP + ty * ACC * (pp.speed || 1);
+    const sp = Math.hypot(cvx[i], cvy[i]); if (sp > vmax) { cvx[i] *= vmax / sp; cvy[i] *= vmax / sp; }
+    cx[i] += cvx[i]; cy[i] += cvy[i];
+    if (cx[i] < WALL) { cx[i] = WALL; cvx[i] = Math.abs(cvx[i]) * 0.5; } else if (cx[i] > 1 - WALL) { cx[i] = 1 - WALL; cvx[i] = -Math.abs(cvx[i]) * 0.5; }
+    if (cy[i] < WALL) { cy[i] = WALL; cvy[i] = Math.abs(cvy[i]) * 0.5; } else if (cy[i] > 1 - WALL) { cy[i] = 1 - WALL; cvy[i] = -Math.abs(cvy[i]) * 0.5; }
+    let base = 0.001 * (pp.base || 1);
+    if (pp.herd) base *= sense.kin >= 2 ? 0.55 : 1.25;
+    if (pp.loner) base *= sense.cn === 0 ? 0.7 : 1.6;
+    energy[i] -= base + 0.0012 * (pp.move || 1) * (tx * tx + ty * ty);
     age[i]++;
   }
   // eating (one pass over food near each cell)
   for (let i = 0; i < n; i++) {
-    const c = cellOf(cx[i], cy[i]);
+    const c = cellOf(cx[i], cy[i]), er = EAT * (pers(lin[i]).eat || 1);
     for (let k = fHead[c]; k !== -1; k = fNext[k]) {
       if (fx[k] < 0) continue;
       const ddx = wrap(fx[k] - cx[i]), ddy = wrap(fy[k] - cy[i]);
-      if (ddx * ddx + ddy * ddy < EAT * EAT) { fx[k] = -1; energy[i] = Math.min(1.6, energy[i] + 0.3); eaten[i]++; foodEvents++; }
+      if (ddx * ddx + ddy * ddy < er * er) { fx[k] = -1; energy[i] = Math.min(1.6, energy[i] + 0.3); eaten[i]++; foodEvents++; }
     }
   }
   for (let k = nf - 1; k >= 0; k--) if (fx[k] < 0) removeFood(k);
+  interact();
   // division and death
   for (let i = n - 1; i >= 0; i--) {
-    if (energy[i] <= 0 || age[i] > 9000) { if (rnd() < 0.5) addFood(cx[i], cy[i]); removeCell(i); continue; }
-    if (energy[i] > 1.2 && n < MAXC) {
-      energy[i] *= 0.5; kids[i]++;
-      const l = rnd() < 0.03 ? newLineage(lin[i]) : lin[i];
-      addCell(cx[i] + (rnd() - .5) * 0.01, cy[i] + (rnd() - .5) * 0.01, energy[i], l, gen[i] + 1, i);
+    const pp = pers(lin[i]), k = (lin[i] - 1) % P.length;
+    if (energy[i] <= 0 || age[i] > 9000 * (pp.life || 1)) {
+      const st = SPS[k]; st.deaths++; st.lifeSum += age[i];
+      if (energy[i] > 0) st.old++; else if (steps - lastBit[i] < 90 && lastBit[i]) st.eaten++; else st.starved++;
+      scavenge(i);
+      removeCell(i); continue;
+    }
+    if (energy[i] > (pp.divide || 1.2) && n < MAXC) {
+      energy[i] = (energy[i] - 0.05) * 0.5; kids[i]++; SPS[k].births++;
+      addCell(cx[i] + (rnd() - .5) * 0.01, cy[i] + (rnd() - .5) * 0.01, energy[i], lin[i], gen[i] + 1, i);
+    }
+  }
+  for (let k = 0; k < P.length; k++) if (!SPS[k].extinctAt && steps > 60) { let alive = false; for (let i = 0; i < n; i++) if ((lin[i] - 1) % P.length === k) { alive = true; break; } if (!alive) { SPS[k].extinctAt = steps; note({ text: `The ${P[k].key}s (${latinName(k + 1)}) went extinct.`, source: "sim" }); } }
+  if (steps % 1800 === 0 && n) {
+    const L = lineageStats(), leader = L[0].id, donors = []; for (let i = 0; i < n; i++) if (lin[i] === leader) donors.push(i);
+    for (let k = 0; k < P.length; k++) if (SPS[k].extinctAt) {
+      for (let m = 0; m < 4 && n < MAXC; m++) addCell(rnd(), rnd(), 1.0, k + 1, 0, donors[(rnd() * donors.length) | 0]);
+      SPS[k].extinctAt = 0; SPS[k].returns = (SPS[k].returns || 0) + 1;
+      note({ text: `4 ${P[k].key}s migrated in, carrying copies of the leading ${pers(leader).key}s' brains. Same brain, different personality: can they hold on this time?`, source: "sim" });
     }
   }
   // keep the dish from dying out entirely
-  if (n < 12) for (let i = 0; i < 12; i++) addCell(rnd(), rnd(), 0.7, newLineage(), 0, -1);
+  if (n < 12) for (let i = 0; i < 12; i++) addCell(rnd(), rnd(), 0.7, 1 + ((rnd() * P.length) | 0), 0, -1);
   if (steps % 120 === 0) sample();
 }
 
+function forNeighbors(i, r, fn) {
+  const gx = gIdx(cx[i]), gy = gIdx(cy[i]);
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const ax = gx + dx, ay = gy + dy; if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) continue;
+    for (let j = cHead[ax * GRID + ay]; j !== -1; j = cNext[j]) {
+      if (j === i || j >= n) continue;
+      const ddx = cx[j] - cx[i], ddy = cy[j] - cy[i]; if (ddx * ddx + ddy * ddy < r * r) fn(j);
+    }
+  }
+}
+function flash(i, j, type) { if (flashes.length < 200) flashes.push({ x1: cx[i], y1: cy[i], x2: cx[j], y2: cy[j], type, t: 0 }); }
+function interact() {
+  rebin();
+  for (let i = 0; i < n; i++) {
+    const pp = pers(lin[i]), k = (lin[i] - 1) % P.length;
+    if (pp.bite && energy[i] < 1.4) forNeighbors(i, TOUCH, j => {
+      if (lin[j] === lin[i] || energy[j] <= 0 || steps - lastBit[j] < 20) return;
+      const take = Math.min(0.15, energy[j]); energy[j] -= take; energy[i] += take * 0.7; lastBit[j] = steps; SPS[k].bites++; flash(i, j, "bite");
+    });
+    if (pp.share && energy[i] > 0.7) {
+      let best = -1; forNeighbors(i, CROWD, j => { if (lin[j] === lin[i] && energy[j] < 0.4 && (best < 0 || energy[j] < energy[best])) best = j; });
+      if (best >= 0) { energy[i] -= 0.006; energy[best] += 0.006; SPS[k].shares++; if (steps % 6 === 0) flash(i, best, "share"); }
+    }
+  }
+}
+function scavenge(dead) {
+  let best = -1, bd = SENSE * SENSE;
+  for (let j = 0; j < n; j++) { if (j === dead || !pers(lin[j]).scav) continue; const d = (cx[j] - cx[dead]) ** 2 + (cy[j] - cy[dead]) ** 2; if (d < bd) { bd = d; best = j; } }
+  if (best >= 0) { energy[best] = Math.min(1.6, energy[best] + 0.3); SPS[(lin[best] - 1) % P.length].scav++; flash(best, dead, "scav"); }
+  else if (rnd() < 0.5) addFood(cx[dead], cy[dead]);
+}
 function sample() {
   const perMin = n ? foodEvents / n * (3600 / 120) : 0;   // 60 steps = 1 s of sim time
   history.push({ t: steps, food: perMin, aim: aimN ? aimSum / aimN : 0 });
@@ -276,14 +352,13 @@ function lineageStats() {
     let s = m.get(lin[i]); if (!s) m.set(lin[i], s = { id: lin[i], count: 0, eaten: 0, age: 0, gen: 0, speed: 0 });
     s.count++; s.eaten += eaten[i]; s.age += age[i]; s.gen = Math.max(s.gen, gen[i]); s.speed += Math.hypot(cvx[i], cvy[i]);
   }
-  for (const id of [...lineages.keys()]) if (!m.has(id)) lineages.delete(id);
   return [...m.values()].sort((a, b) => b.count - a.count);
 }
 const GEN_A = ["Vermis", "Natator", "Globulus", "Cursor", "Venator", "Errans", "Cellula", "Spira", "Lucidus", "Vorax", "Sitiens", "Quaerens", "Nomas", "Pabulator"];
 const EPI_A = ["fluorescens", "rapax", "gregarius", "solitarius", "velox", "tardus", "famelicus", "audax", "timidus", "pulsans", "vagans", "sagax", "obscurus", "aureus"];
-function latinName(id) { const g = GEN_A.length, e = EPI_A.length, k = Math.floor(id / (g * e)); return `${GEN_A[id % g]} ${EPI_A[Math.floor(id / g) % e]}${k ? " " + (k + 1) : ""}`; }
-const linName = id => { const L = lineages.get(id); return L ? (L.aiName || L.name) : "extinct"; };
-const linColor = (id, l = 60) => { const L = lineages.get(id); return `hsl(${L ? L.hue : 0} 90% ${l}%)`; };
+function latinName(id) { const g = GEN_A.length, e = EPI_A.length, k = Math.floor(id / (g * e)); return `${GEN_A[id % g]} ${EPI_A[(id * 5 + Math.floor(id / g)) % e]}${k ? " " + (k + 1) : ""}`; }
+const linName = id => { const L = lineages.get(id); return L ? (L.aiName || L.name) : latinName(id); };
+const linColor = (id, l = 60) => `hsl(${pers(id).hue} 90% ${l}%)`;
 
 // ======================= rendering =======================
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), ov = document.getElementById("ov"), octx = ov.getContext("2d");
@@ -295,6 +370,15 @@ function draw() {
   ctx.fillStyle = "rgba(255,244,214,0.8)"; const fs = Math.max(2.5, S / 220);
   for (let k = 0; k < nf; k++) ctx.fillRect(fx[k] * S - fs / 2, fy[k] * S - fs / 2, fs, fs);
   const r = Math.max(3.5, S / 120); octx.clearRect(0, 0, S, S);
+  octx.strokeStyle = "#3a4a63"; octx.lineWidth = Math.max(2, S / 300); octx.strokeRect(WALL * S * 0.5, WALL * S * 0.5, S - WALL * S, S - WALL * S);
+  for (let f = flashes.length - 1; f >= 0; f--) {
+    const F = flashes[f]; F.t++; if (F.t > 40) { flashes.splice(f, 1); continue; }
+    const a = 1 - F.t / 40; octx.globalAlpha = a; octx.lineWidth = Math.max(2, S / 350);
+    octx.strokeStyle = F.type === "bite" ? "#ff4d6d" : F.type === "share" ? "#4dffe1" : "#c08bff";
+    octx.beginPath(); octx.moveTo(F.x1 * S, F.y1 * S); octx.lineTo(F.x2 * S, F.y2 * S); octx.stroke();
+    if (F.type !== "share") { octx.beginPath(); octx.arc(F.x2 * S, F.y2 * S, r * (1.5 + F.t / 10), 0, 6.2832); octx.stroke(); }
+    octx.globalAlpha = 1;
+  }
   let sel = -1;
   for (let i = 0; i < n; i++) {
     if (uid[i] === selectedUid) sel = i;
@@ -342,7 +426,7 @@ function drawBrain(i) {
   for (let hh = 0; hh < NH; hh++) node(xh, yh(hh), hid[hh]);
   for (let q = 0; q < NO; q++) { node(xo, yo(q), out[q]); bctx.fillStyle = "#e6edf3"; bctx.textAlign = "left"; bctx.fillText(`${OUT_LABELS[q]} ${out[q] >= 0 ? "+" : ""}${out[q].toFixed(2)}`, xo + 9 * d, yo(q)); }
   const info = document.getElementById("cellinfo");
-  info.innerHTML = `<span><b style="color:${linColor(lin[i])}">${esc(linName(lin[i]))}</b></span><span>generation <b>${gen[i]}</b></span><span>energy <b>${energy[i].toFixed(2)}</b></span><span>ate <b>${eaten[i]}</b></span><span>children <b>${kids[i]}</b></span>${followNote ? "<span>(the cell you picked died; following a relative)</span>" : ""}`;
+  info.innerHTML = `<span><b style="color:${linColor(lin[i])}">${pers(lin[i]).key}</b> · ${esc(linName(lin[i]))}</span><span>generation <b>${gen[i]}</b></span><span>energy <b>${energy[i].toFixed(2)}</b></span><span>ate <b>${eaten[i]}</b></span><span>children <b>${kids[i]}</b></span>${followNote ? "<span>(the cell you picked died; following a relative)</span>" : ""}`;
 }
 cv.addEventListener("click", e => {
   const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
@@ -374,9 +458,18 @@ function updatePanels() {
   $("sPop").textContent = n; $("sLin").textContent = L.length; $("sGen").textContent = maxG;
   $("sFood").textContent = last ? last.food.toFixed(1) : "–"; $("sAim").textContent = last ? Math.round((last.aim + 1) * 50) + "%" : "–";
   const sec = steps / 60; $("sTime").textContent = sec < 60 ? Math.round(sec) + " s" : Math.floor(sec / 60) + "m " + String(Math.round(sec % 60)).padStart(2, "0") + "s";
-  $("lineages").innerHTML = L.slice(0, 6).map(s => `<div class="lin"><span class="sw" style="background:${linColor(s.id)}"></span>
-    <div><div class="nm"><em>${esc(linName(s.id))}</em> · gen ${s.gen}</div><div class="bar"><div style="width:${(s.count / n * 100).toFixed(1)}%;background:${linColor(s.id)}"></div></div></div>
-    <span class="pc">${(s.count / n * 100).toFixed(0)}%</span></div>`).join("");
+  const byId = new Map(L.map(s => [s.id, s]));
+  $("lineages").innerHTML = P.map((pp, k) => {
+    const id = k + 1, s = byId.get(id), st = SPS[k], col = `hsl(${pp.hue} 90% 60%)`, cnt = s ? s.count : 0;
+    const life = st.deaths ? Math.round(st.lifeSum / st.deaths / 60) + " s" : "–";
+    const acts = pp.bite ? ` · ${st.bites} bites` : pp.share ? ` · ${st.shares > 999 ? (st.shares / 1000).toFixed(1) + "k" : st.shares} shares` : pp.scav ? ` · ${st.scav} scavenged` : "";
+    return `<div class="lin${cnt ? "" : " dead"}"><span class="sw" style="background:${col}"></span>
+      <div><div class="nm"><b style="color:${col}">${pp.key}</b> · <em>${esc(linName(id))}</em>${cnt ? "" : st.extinctAt ? ` · extinct at ${Math.round(st.extinctAt / 60)} s, migrants return soon` : ""}</div>
+      <div class="why">${pp.blurb}</div>
+      <div class="bar"><div style="width:${(cnt / Math.max(1, n) * 100).toFixed(1)}%;background:${col}"></div></div>
+      <div class="facts">avg life ${life} · ${st.births} born · died: ${st.starved} starved, ${st.eaten} eaten, ${st.old} old age${acts}</div></div>
+      <span class="pc">${cnt}</span></div>`;
+  }).join("");
   return L;
 }
 function note({ text, title, source, extra }) {
@@ -386,7 +479,7 @@ function note({ text, title, source, extra }) {
   const f = $("feed"); f.prepend(e); while (f.children.length > 40) f.lastChild.remove();
 }
 
-const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 2, acc = 0;
+const SPEEDS = [0.5, 1, 2, 3, 5, 8, 12]; let running = true, speed = 1, acc = 0;
 $("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
 $("speed").oninput = e => { speed = SPEEDS[+e.target.value]; $("speedv").textContent = speed + "×"; };
 $("reset").onclick = () => newDish();
@@ -407,13 +500,17 @@ function digest(L) {
     return { name: linName(s.id), id: s.id, share: Math.round(s.count / n * 100), cells: s.count, food_per_cell: +(s.eaten / s.count).toFixed(1),
              deepest_generation: s.gen, avg_age_s: Math.round(s.age / s.count / 60), avg_speed: +(s.speed / s.count * 1000).toFixed(2), push_toward_food_east: +(toward / idx.length).toFixed(2) };
   });
-  return { sim_seconds: Math.round(steps / 60), cells: n, lineages_alive: L.length, food_per_cell_per_min_now: +last.food.toFixed(2), food_per_cell_per_min_earlier: +first.food.toFixed(2),
+  const species = P.map((pp, k) => { const st = SPS[k], s = L.find(x => x.id === k + 1);
+    return { personality: pp.key, trait: pp.blurb, alive: s ? s.count : 0, born: st.births, avg_life_s: st.deaths ? Math.round(st.lifeSum / st.deaths / 60) : null, starved: st.starved, eaten: st.eaten, old_age: st.old, bites: st.bites, shares: st.shares, scavenged: st.scav }; });
+  return { species, sim_seconds: Math.round(steps / 60), cells: n, lineages_alive: L.length, food_per_cell_per_min_now: +last.food.toFixed(2), food_per_cell_per_min_earlier: +first.food.toFixed(2),
            steers_toward_food_pct: Math.round((last.aim + 1) * 50), top_lineages: top };
 }
 function offlineNote(dg) {
   const t = dg.top_lineages[0]; if (!t) return "The dish is empty.";
   const trend = dg.food_per_cell_per_min_now > dg.food_per_cell_per_min_earlier * 1.1 ? "Food intake is rising" : dg.food_per_cell_per_min_now < dg.food_per_cell_per_min_earlier * 0.9 ? "Food intake is falling" : "Food intake is steady";
-  return `${t.name} holds ${t.share}% of the dish after ${t.deepest_generation} generations. ${trend} (${dg.food_per_cell_per_min_now} per cell per minute), and ${dg.steers_toward_food_pct}% of food-seeing cells steer toward it.`;
+  const top = dg.species.filter(x => x.alive).sort((a, b) => b.alive - a.alive)[0], worst = dg.species.filter(x => x.born || x.alive).sort((a, b) => (b.starved + b.eaten) - (a.starved + a.eaten))[0];
+  const extra = top ? ` The ${top.personality}s lead with ${top.alive} cells.` + (worst && worst !== top ? ` The ${worst.personality}s have lost the most (${worst.starved} starved, ${worst.eaten} eaten).` : "") : "";
+  return `${t.name} holds ${t.share}% of the dish after ${t.deepest_generation} generations.${extra} ${trend} (${dg.food_per_cell_per_min_now} per cell per minute), and ${dg.steers_toward_food_pct}% of food-seeing cells steer toward it.`;
 }
 async function narrate() {
   if (narrating) return; narrating = true;
@@ -423,7 +520,8 @@ async function narrate() {
     const prompt = `You narrate an artificial-life petri dish. Every cell runs its own tiny neural network brain (10 senses -> 6 neurons -> a push direction). Cells that eat food divide and pass on a mutated copy of their brain, so lineages evolve. Here are the current stats as JSON:
 ${JSON.stringify(dg)}
 "push_toward_food_east" is how hard that lineage's brains push toward food placed to their east (1 = straight at it, 0 = ignore, negative = away).
-Reply with only a JSON object: {"names": {"<lineage id>": "<made-up two-word Latin species name>", ...for each top lineage}, "field_note": "<2-3 sentences, like a nature documentary, about who is winning and what their brains seem to have learned, using the numbers>"}`;
+Each species has a fixed personality ("trait") that changes how it lives and interacts.
+Reply with only a JSON object: {"names": {"<lineage id>": "<made-up two-word Latin species name>", ...for each top lineage}, "field_note": "<2-3 sentences, like a nature documentary, about how the personalities are playing out: who is winning, who is dying and how, using the numbers>"}`;
     const r = await NAT.ask(model, prompt, { maxNewTokens: 220 });
     let obj = null; const s = r.raw.indexOf("{"), e = r.raw.lastIndexOf("}");
     if (s >= 0 && e > s) try { obj = JSON.parse(r.raw.slice(s, e + 1)); } catch {}
