@@ -74,6 +74,12 @@ b.attack{color:var(--neg)} b.share{color:var(--teal)} b.flee{color:var(--warn)} 
 .prog>div{height:100%;width:0;background:var(--accent);transition:width .2s}
 .tag{font-size:11px;padding:1px 6px;border-radius:99px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
 .tag.ai{color:var(--accent);border-color:#2b6b45}
+.tabs button[hidden]{display:none}
+table.sb{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+table.sb th{color:var(--muted);font-weight:600;text-align:right;padding:4px}
+table.sb th:first-child,table.sb td:first-child{text-align:left}
+table.sb td{text-align:right;padding:4px;border-top:1px solid var(--line)}
+table.sb tr.bonsai td{color:var(--accent);font-weight:600}
 @media (max-width:1000px){
   html,body{height:auto} .app{height:auto}
   .body{grid-template-columns:1fr}
@@ -85,11 +91,12 @@ b.attack{color:var(--neg)} b.share{color:var(--teal)} b.flee{color:var(--warn)} 
 <body>
 <div class="app">
   <div class="top">
-    <div class="brand"><h1>Bonsai Village</h1><p>Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. The camera follows whoever it is thinking for. White bubbles are what they say; red bubbles are what they secretly think.</p></div>
+    <div class="brand"><h1>Bonsai Village</h1><p id="brandText">Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. The camera follows whoever it is thinking for. White bubbles are what they say; red bubbles are what they secretly think.</p></div>
     <span id="status" class="status">Bonsai: loading…</span>
     <div class="controls">
       <button id="play" class="primary">Pause</button>
       <label class="sl"><input id="cine" type="checkbox" checked> Camera follows</label>
+      <button id="mode" title="Switch between an all-Bonsai village and one Bonsai creature against five rule-based bots">Mode: all Bonsai</button>
       <button id="feast" title="Scatter a lot of food">Feast</button>
       <button id="famine" title="Remove all food for 20 seconds">Famine</button>
       <button id="reset">New village</button>
@@ -114,6 +121,7 @@ b.attack{color:var(--neg)} b.share{color:var(--teal)} b.flee{color:var(--warn)} 
       <div class="tabs" role="tablist">
         <button role="tab" id="tab-mind" aria-selected="true">Mind</button>
         <button role="tab" id="tab-story" aria-selected="false">Story</button>
+        <button role="tab" id="tab-arena" aria-selected="false" hidden>Scoreboard</button>
       </div>
 
       <div class="pane" id="pane-mind">
@@ -145,6 +153,13 @@ b.attack{color:var(--neg)} b.share{color:var(--teal)} b.flee{color:var(--warn)} 
         <div><h2>Feelings</h2><div class="feel" id="mFeel"></div></div>
       </div>
 
+      <div class="pane" id="pane-arena" hidden>
+        <div class="card"><div class="k">Bonsai vs the bots</div><div id="roundInfo" class="small"></div><div class="bar"><div id="roundBar" style="background:var(--accent)"></div></div></div>
+        <div id="board"></div>
+        <div><h2>The bots' rules</h2><ul class="mem" id="botRules"></ul></div>
+        <p class="small">Same bodies, same energy and food rules for everyone. Bots re-decide 4 times a second; Bonsai decides as fast as your GPU allows. Each round, Bonsai moves to the next body so no body gets an unfair start.</p>
+      </div>
+
       <div class="pane" id="pane-story" hidden>
         <div class="feed" id="feed"></div>
       </div>
@@ -164,6 +179,15 @@ const CAST = [
   ["Rook", "a loyal guard who protects friends from bullies", 215],
   ["Juno", "a gossip who loves spreading news and secrets", 320],
 ];
+const BOTS = {
+  greedy: { label: "Greedy bot", rule: "Always heads for the nearest food." },
+  bully: { label: "Bully bot", rule: "Attacks the weakest creature it can see if that one is weaker than itself; otherwise eats." },
+  coward: { label: "Coward bot", rule: "Flees anyone who comes within a short distance; otherwise eats." },
+  social: { label: "Social bot", rule: "Shares with anyone starving when it has energy to spare; follows the nearest creature when full; otherwise eats." },
+  random: { label: "Random bot", rule: "Picks a random action and target every 3 seconds." },
+};
+const ARENA_BONSAI = "a survivor who wants to stay alive as long as possible, using or avoiding the others as needed";
+let mode = "village", roundT = 0, round = 0, bonsaiSeat = 0, board = {};
 const ACTIONS = ["eat", "rest", "wander", "follow", "flee", "attack", "share", "tell"];
 const NEEDS_TARGET = new Set(["follow", "flee", "attack", "share", "tell"]);
 const ACT_DESC = { eat: "eat (go to the nearest food)", rest: "rest (save energy)", wander: "wander", follow: "follow NAME", flee: "flee NAME", attack: "attack NAME (steal their energy)", share: "share NAME (give them some of your energy)", tell: "tell NAME something (put it in \"say\"; they will remember it)" };
@@ -174,13 +198,19 @@ const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2
 function makeCreature([name, personality, hue]) {
   return { name, personality, hue, x: clampIn(0.15 + rnd() * 0.7), y: clampIn(0.15 + rnd() * 0.7), vx: 0, vy: 0, energy: 0.6 + rnd() * 0.3, alive: true,
            action: { type: "wander", target: null }, say: "", thought: "", shownUntil: 0, memory: [], feelings: {}, lastTurn: -1e9, met: {},
-           whisper: null, heading: rnd() * 6.283, touched: 0, decisions: 0, rumor: 0, last: null };
+           whisper: null, heading: rnd() * 6.283, touched: 0, decisions: 0, rumor: 0, last: null, brain: "bonsai", ate: 0, stole: 0, botT: 0 };
 }
 function newVillage() {
-  C = CAST.map(makeCreature); food = []; events = []; picks.fill(0); firstPicks = 0; totalPicks = 0;
+  C = CAST.map(makeCreature);
+  if (mode === "arena") {
+    const kinds = Object.keys(BOTS);
+    C.forEach((c, k) => { const j = (k - bonsaiSeat + C.length) % C.length; if (j === 0) { c.brain = "bonsai"; c.personality = ARENA_BONSAI; } else { c.brain = kinds[j - 1]; c.personality = BOTS[c.brain].rule; } });
+    roundT = 0; round++;
+  } food = []; events = []; picks.fill(0); firstPicks = 0; totalPicks = 0;
   for (let i = 0; i < 12; i++) food.push({ x: clampIn(rnd()), y: clampIn(rnd()) });
-  selected = C[1]; simT = 0; famineUntil = 0; spot = null; $("feed").innerHTML = "";
-  story("A new village wakes up: " + C.map(c => `${c.name} (${c.personality})`).join(", ") + ".", "god");
+  selected = C[1]; simT = 0; famineUntil = 0; spot = null; fx.length = 0; $("feed").innerHTML = "";
+  if (mode === "arena") { const b = C.find(c => c.brain === "bonsai"); selected = b; story(`Round ${round}: ${b.name} is played by Bonsai. The other five are rule-based bots.`, "god"); }
+  else story("A new village wakes up: " + C.map(c => `${c.name} (${c.personality})`).join(", ") + ".", "god");
 }
 const byName = n => C.find(c => c.alive && c.name.toLowerCase() === String(n || "").trim().toLowerCase().replace(/[^a-z]/g, ""));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -188,9 +218,18 @@ function remember(c, text) { c.memory.unshift({ t: simT, text }); if (c.memory.l
 function feel(c, other, d) { c.feelings[other] = Math.max(-5, Math.min(5, (c.feelings[other] || 0) + d)); }
 const feelWord = v => v <= -3 ? "hates" : v <= -1 ? "distrusts" : v >= 3 ? "trusts" : v >= 1 ? "likes" : "is neutral about";
 const feelYou = v => v <= -3 ? "you hate" : v <= -1 ? "you distrust" : v >= 3 ? "you trust" : v >= 1 ? "you like" : "you feel neutral about";
-function trigger(c, reason, prio = 1) { if (!c.alive) return; const e = events.find(e => e.c === c); if (e) { if (prio >= e.prio) { e.reason = reason; e.prio = prio; } } else events.push({ c, reason, prio, t: simT }); }
+function trigger(c, reason, prio = 1) { if (!c.alive || c.brain !== "bonsai") return; const e = events.find(e => e.c === c); if (e) { if (prio >= e.prio) { e.reason = reason; e.prio = prio; } } else events.push({ c, reason, prio, t: simT }); }
 
 // ===================== physics =====================
+function botDecide(c) {
+  const vis = C.filter(o => o.alive && o !== c).map(o => ({ o, d: dist(o, c) })).filter(e => e.d < SEE).sort((a, b) => a.d - b.d);
+  const set = (type, T) => { c.action = { type, target: T ? T.name : null }; };
+  if (c.brain === "greedy") set("eat");
+  else if (c.brain === "bully") { const w = vis.filter(e => e.o.energy < c.energy).sort((a, b) => a.o.energy - b.o.energy)[0]; w ? set("attack", w.o) : set("eat"); }
+  else if (c.brain === "coward") { vis[0] && vis[0].d < 0.15 ? set("flee", vis[0].o) : set("eat"); }
+  else if (c.brain === "social") { const s = vis.find(e => e.o.energy < 0.3); if (s && c.energy > 0.6) set("share", s.o); else if (vis[0] && c.energy > 0.75) set("follow", vis[0].o); else set("eat"); }
+  else if (c.brain === "random") { if (simT - c.botT > 3) { c.botT = simT; const a = ACTIONS[(rnd() * ACTIONS.length) | 0], T = vis.length ? vis[(rnd() * vis.length) | 0].o : null; NEEDS_TARGET.has(a) && !T ? set("eat") : set(a === "tell" ? "wander" : a, NEEDS_TARGET.has(a) ? T : null); } }
+}
 function steerTo(c, tx, ty, sp) { const dx = tx - c.x, dy = ty - c.y, m = Math.hypot(dx, dy) + 1e-9; c.vx += (dx / m) * sp * 0.15; c.vy += (dy / m) * sp * 0.15; }
 function tick(dt) {
   simT += dt;
@@ -198,6 +237,7 @@ function tick(dt) {
   const SP = 0.0019 * dt * 60;
   for (const c of C) {
     if (!c.alive) continue;
+    if (c.brain !== "bonsai" && (simT * 4 | 0) !== ((simT - dt) * 4 | 0)) botDecide(c);
     const a = c.action, T = a.target ? byName(a.target) : null;
     if (NEEDS_TARGET.has(a.type) && !T) { a.type = "wander"; a.target = null; }
     let moving = true;
@@ -211,7 +251,7 @@ function tick(dt) {
       if (dist(c, T) < R_TOUCH && simT - c.touched > 1.5) {
         c.touched = simT;
         if (a.type === "attack") {
-          const take = Math.min(0.2, T.energy); T.energy -= take; c.energy = Math.min(1, c.energy + take * 0.8);
+          const take = Math.min(0.2, T.energy); T.energy -= take; c.energy = Math.min(1, c.energy + take * 0.8); c.stole += take;
           remember(T, `${c.name} attacked me`); feel(T, c.name, -2); remember(c, `I attacked ${T.name}`);
           for (const o of C) if (o.alive && o !== c && o !== T && dist(o, c) < SEE) { remember(o, `I saw ${c.name} attack ${T.name}`); feel(o, c.name, -1); }
           story(`${c.name} attacked ${T.name}.`, "attack"); burst(T, "attack"); trigger(T, `${c.name} just attacked you and stole energy!`, 3);
@@ -227,11 +267,11 @@ function tick(dt) {
     c.x += c.vx * dt * 60; c.y += c.vy * dt * 60;
     if (c.x < WALL || c.x > 1 - WALL) { c.vx = -c.vx; c.heading = Math.PI - c.heading; c.x = clampIn(c.x); }
     if (c.y < WALL || c.y > 1 - WALL) { c.vy = -c.vy; c.heading = -c.heading; c.y = clampIn(c.y); }
-    for (let k = food.length - 1; k >= 0; k--) if (Math.hypot(food[k].x - c.x, food[k].y - c.y) < R_EAT) { food.splice(k, 1); c.energy = Math.min(1, c.energy + 0.2); }
+    for (let k = food.length - 1; k >= 0; k--) if (Math.hypot(food[k].x - c.x, food[k].y - c.y) < R_EAT) { food.splice(k, 1); c.energy = Math.min(1, c.energy + 0.2); c.ate++; }
     c.energy -= dt * (moving ? 0.014 : 0.005);
     if (c.energy < 0.25 && !c.hungryFlag) { c.hungryFlag = true; trigger(c, "You are starving.", 2); } else if (c.energy > 0.4) c.hungryFlag = false;
     if (c.energy <= 0) {
-      c.alive = false; c.energy = 0; c.diedAt = simT; story(`${c.name} died.`, "death");
+      c.alive = false; c.energy = 0; c.diedAt = simT; story(`${c.name}${c.brain !== "bonsai" || mode === "arena" ? ` (${brainLabel(c)})` : ""} died.`, "death");
       for (const o of C) if (o.alive && dist(o, c) < SEE) { remember(o, `${c.name} died near me`); trigger(o, `${c.name} just died right near you.`, 2); }
       for (let k = 0; k < 3; k++) food.push({ x: clampIn(c.x + (rnd() - .5) * .05), y: clampIn(c.y + (rnd() - .5) * .05) });
     }
@@ -296,23 +336,24 @@ function applyDecision(c, d, meta, reason) {
 let model = null, NAT = null, stats = { n: 0, ms: 0, tok: 0, invalid: 0 }, spot = null, streamRaw = "";
 async function turnLoop() {
   while (true) {
-    if (!running || frozen || !C.some(c => c.alive)) { await sleep(250); continue; }
-    events = events.filter(e => e.c.alive);
+    if (!running || frozen || !C.some(c => c.alive && c.brain === "bonsai")) { await sleep(250); continue; }
+    events = events.filter(e => e.c.alive && e.c.brain === "bonsai");
     events.sort((a, b) => b.prio - a.prio || a.t - b.t);
     let e = events.shift();
-    if (!e) { const c = C.filter(c => c.alive).sort((a, b) => a.lastTurn - b.lastTurn)[0]; e = { c, reason: "Nothing special is happening right now." }; }
+    if (!e) { const c = C.filter(c => c.alive && c.brain === "bonsai").sort((a, b) => a.lastTurn - b.lastTurn)[0]; e = { c, reason: "Nothing special is happening right now." }; }
     const c = e.c, reason = e.reason;
     spot = { c, phase: "thinking" }; streamRaw = "";
     const P = buildPrompt(c, reason);
     let r = null;
     try { r = await NAT.ask(model, P.text, { maxNewTokens: 80, onToken: raw => { streamRaw = raw; } }); } catch (err) { console.warn(err); }
-    if (r) {
+    if (r && C.includes(c)) {
       const d = parseDecision(r.raw); stats.n++; stats.ms += r.ms; stats.tok += r.tokens; if (!d.valid) stats.invalid++;
       const k = ACTIONS.indexOf(d.action); if (k >= 0 && d.valid) { picks[k]++; totalPicks++; if (P.order[0] === d.action) firstPicks++; }
       applyDecision(c, d, { ai: true, ms: r.ms, raw: r.raw }, reason);
     }
+    if (!spot || !C.includes(c)) { spot = null; continue; }
     spot.phase = "acting";
-    await sleep(model.stub ? 500 : 1100);   // hold the camera on the result
+    await sleep(mode === "arena" ? 250 : (model.stub ? 500 : 1100));   // hold the camera on the result
     spot = null;
   }
 }
@@ -327,7 +368,7 @@ const col = (c, l = 62) => c.alive ? `hsl(${c.hue} 85% ${l}%)` : "#4b5563";
 const ACOL = { attack: "#ff5c7a", share: "#4dffe1", follow: "rgba(230,237,243,.6)", flee: "#ffb84d", tell: "#ffd166" };
 function burst(c, type) { fx.push({ c, type, t: simT }); }
 function camTarget() {
-  if (!$("cine").checked) return { x: .5, y: .5, z: 1 };
+  if (!$("cine").checked || (mode === "arena" && !frozen)) return { x: .5, y: .5, z: 1 };
   if (frozen && selected) return { x: selected.x, y: selected.y, z: 1.7 };
   if (spot) { const T = spot.c.action.target && spot.phase === "acting" ? byName(spot.c.action.target) : null; return T ? { x: (spot.c.x + T.x) / 2, y: (spot.c.y + T.y) / 2, z: 1.45 } : { x: spot.c.x, y: spot.c.y, z: 1.6 }; }
   return { x: .5, y: .5, z: 1 };
@@ -368,6 +409,7 @@ function draw(dtReal) {
     if (c.alive) { ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 3 * u; ctx.beginPath(); ctx.arc(x, y, rr + 4 * u, -Math.PI / 2, -Math.PI / 2 + 6.283 * Math.min(1, c.energy)); ctx.stroke(); }
     ctx.font = `700 ${fsz}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = c.alive ? "#e6edf3" : "#6b7280";
     ctx.fillText(c.alive ? c.name : c.name + " ✝", x, y + rr + 8 * u);
+    if (mode === "arena") { ctx.font = `600 ${fsz * .8}px ui-sans-serif,system-ui,sans-serif`; ctx.fillStyle = c.brain === "bonsai" ? "#4dff88" : "#8b98a9"; ctx.fillText(brainLabel(c), x, y + rr + 8 * u + fsz * 1.2); }
     ctx.globalAlpha = 1;
   }
   if (spot && spot.c.alive) {
@@ -399,7 +441,7 @@ function bubbles(c, r, u) {
 }
 function codeStrip(c, r, u) {
   const fsz = Math.max(11, S / 64) * u, txt = (streamRaw || "Bonsai is thinking…").replace(/\s+/g, " ").slice(-64);
-  ctx.font = `${fsz}px ui-monospace,Menlo,monospace`; const w = Math.min(S * 0.5 * u, ctx.measureText(txt).width + 16 * u), x = c.x * S - w / 2, y = c.y * S + r + 30 * u, h = fsz * 1.9;
+  ctx.font = `${fsz}px ui-monospace,Menlo,monospace`; const w = Math.min(S * 0.5 * u, ctx.measureText(txt).width + 16 * u), x = c.x * S - w / 2, y = c.y * S + r + 46 * u, h = fsz * 1.9;
   ctx.fillStyle = "rgba(10,20,14,.92)"; ctx.strokeStyle = "#2b6b45"; ctx.lineWidth = 1.5 * u; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6 * u); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.fillStyle = "#4dff88"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, x + 8 * u, y + h / 2); ctx.restore(); ctx.textAlign = "center";
 }
@@ -411,11 +453,40 @@ cv.addEventListener("click", e => {
   else { for (let k = 0; k < 3; k++) food.push({ x: clampIn(x + (rnd() - .5) * .04), y: clampIn(y + (rnd() - .5) * .04) }); }
 });
 
+const brainLabel = c => c.brain === "bonsai" ? (model && model.stub ? "STUB" : "Bonsai") : BOTS[c.brain].label;
+function arenaTick(dt) {
+  if (mode !== "arena") return;
+  roundT += dt;
+  const alive = C.filter(c => c.alive);
+  if (roundT >= 120 || !alive.length) finishRound();
+}
+function finishRound() {
+  const ranked = [...C].sort((a, b) => ((b.alive ? 1e6 : b.diedAt) + b.energy) - ((a.alive ? 1e6 : a.diedAt) + a.energy));
+  ranked.forEach((c, k) => {
+    const b = board[c.brain] || (board[c.brain] = { rounds: 0, survived: 0, life: 0, ate: 0, stole: 0, wins: 0 });
+    b.rounds++; if (c.alive) b.survived++; b.life += c.alive ? roundT : c.diedAt; b.ate += c.ate; b.stole += c.stole; if (k === 0) b.wins++;
+  });
+  story(`Round ${round} over. Winner: ${ranked[0].name} (${brainLabel(ranked[0])}). Bonsai's ${C.find(c => c.brain === "bonsai").name} ${C.find(c => c.brain === "bonsai").alive ? "survived" : "died"}.`, "god");
+  bonsaiSeat = (bonsaiSeat + 1) % CAST.length; simT = 0; newVillage(); renderBoard();
+}
+function renderBoard() {
+  const rows = Object.entries(board).sort((a, b) => b[1].wins - a[1].wins || b[1].life / b[1].rounds - a[1].life / a[1].rounds);
+  $("board").innerHTML = rows.length ? `<table class="sb"><tr><th>Brain</th><th>Rounds</th><th>Wins</th><th>Survived</th><th>Avg life</th><th>Food/rd</th><th>Stolen/rd</th></tr>${rows.map(([k, b]) => `<tr class="${k === "bonsai" ? "bonsai" : ""}"><td>${k === "bonsai" ? (model && model.stub ? "STUB model" : "Bonsai 2B") : BOTS[k].label}</td><td>${b.rounds}</td><td>${b.wins}</td><td>${Math.round(b.survived / b.rounds * 100)}%</td><td>${Math.round(b.life / b.rounds)} s</td><td>${(b.ate / b.rounds).toFixed(1)}</td><td>${(b.stole / b.rounds).toFixed(2)}</td></tr>`).join("")}</table>` : "<p class='small'>The scoreboard fills in after the first 2-minute round.</p>";
+  $("botRules").innerHTML = Object.values(BOTS).map(b => `<li><b>${b.label}:</b> ${b.rule}</li>`).join("");
+}
+function toggleMode() {
+  mode = mode === "village" ? "arena" : "village"; round = 0; board = {}; bonsaiSeat = 0;
+  $("mode").textContent = mode === "arena" ? "Mode: Bonsai vs bots" : "Mode: all Bonsai";
+  $("brandText").textContent = mode === "arena" ? "One creature is played by Bonsai 2B, running on your GPU inside this tab. The other five are hand-written bots. Same bodies, same rules: who survives longer?" : "Six creatures, all played by Bonsai 2B: a 0.4 GB AI model running on your GPU inside this tab. The camera follows whoever it is thinking for. White bubbles are what they say; red bubbles are what they secretly think."; $("tab-arena").hidden = mode !== "arena";
+  newVillage(); renderBoard(); showTab(mode === "arena" ? "arena" : "mind");
+}
+
 // ===================== panels =====================
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function showTab(t) { for (const k of ["mind", "story"]) { $("tab-" + k).setAttribute("aria-selected", k === t); $("pane-" + k).hidden = k !== t; } }
-for (const k of ["mind", "story"]) $("tab-" + k).onclick = () => showTab(k);
+function showTab(t) { for (const k of ["mind", "story", "arena"]) { $("tab-" + k).setAttribute("aria-selected", k === t); $("pane-" + k).hidden = k !== t; } }
+for (const k of ["mind", "story", "arena"]) $("tab-" + k).onclick = () => showTab(k);
+$("mode").onclick = toggleMode;
 function story(text, kind, thought) {
   const e = document.createElement("div"); e.className = "ev " + (kind || "");
   e.innerHTML = `<span class="t">${fmtT(simT)}</span>${esc(text)}${thought ? `<span class="th">💭 ${esc(thought)}</span>` : ""}`;
@@ -427,17 +498,21 @@ function renderMind() {
   $("mDot").style.background = col(c); $("mName").textContent = c.name + (c.alive ? "" : " (dead)"); $("mPers").textContent = c.personality; $("wName").textContent = c.name;
   $("mEnergy").textContent = Math.round(c.energy * 100) + "%"; $("mBar").style.width = Math.min(100, c.energy * 100) + "%"; $("mBar").style.background = col(c);
   const L = c.last;
+  if (c.brain !== "bonsai") { $("mWhy").textContent = "Rule-based bot (no AI)"; $("mAction").innerHTML = actHtml({ action: c.action.type, target: c.action.target || "" }); $("mSay").textContent = BOTS[c.brain].rule; $("mThought").textContent = ""; $("mMeta").innerHTML = '<span class="tag">' + BOTS[c.brain].label + '</span>'; $("mDecision").className = "card"; }
+  else {
   $("mWhy").textContent = L ? `Latest decision · because: ${L.reason}` : "Latest decision";
   $("mAction").innerHTML = L ? actHtml(L) + (L.note ? ` <span class="small">${esc(L.note)}</span>` : "") : "Waiting for its first turn…";
   $("mSay").textContent = L && L.say ? "💬 " + L.say : ""; $("mThought").textContent = L && L.thought ? "💭 " + L.thought : "";
   $("mMeta").innerHTML = L && L.meta ? `<span class="tag ai">${model && model.stub ? "STUB model" : "Bonsai 2B"} · ${(L.meta.ms / 1000).toFixed(1)} s</span>` : "";
   $("mDecision").className = "card" + (L ? " ai" : "");
+  }
   $("mMem").innerHTML = c.memory.length ? c.memory.map(m => `<li>${esc(m.text)} <span style="color:var(--muted)">· ${Math.round(simT - m.t)} s ago</span></li>`).join("") : "<li style='color:var(--muted)'>Nothing yet.</li>";
   const fe = Object.entries(c.feelings).filter(([, v]) => Math.abs(v) >= 1);
   $("mFeel").innerHTML = fe.length ? fe.map(([k, v]) => `<span style="color:${v < 0 ? "var(--neg)" : "var(--teal)"}">${feelWord(v)} ${esc(k)}</span>`).join("") : "<span style='color:var(--muted)'>No strong feelings yet.</span>";
 }
 $("whisperBtn").onclick = () => {
   const c = selected, t = $("whisper").value.trim(); if (!c || !t || !c.alive) return;
+  if (c.brain !== "bonsai") { $("whisperOut").textContent = `${c.name} is a rule-based bot. It can't hear you.`; return; }
   c.whisper = t; trigger(c, "A voice from the sky just whispered to you.", 4); story(`A voice from the sky whispered to ${c.name}: “${t}”`, "god");
   $("whisperOut").textContent = model ? `${c.name} reacts on its next turn. A gold ring marks everyone who has heard it.` : "Bonsai isn't awake yet.";
 };
@@ -449,6 +524,7 @@ $("rethink").onclick = async () => {
   const c = selected, np = $("newPers").value.trim();
   if (!model) { $("rethinkOut").textContent = "Bonsai isn't awake yet."; return; }
   if (!c || !c.alive || !np) return;
+  if (c.brain !== "bonsai") { $("rethinkOut").textContent = `${c.name} is a rule-based bot; only Bonsai creatures can be rewritten.`; return; }
   const btn = $("rethink"); btn.disabled = true; frozen = true; $("rethinkOut").textContent = "Frozen. Bonsai is deciding twice…"; $("ab").hidden = true; $("abBtns").hidden = true;
   while (spot) await sleep(50);
   const reason = c.last ? c.last.reason : "Nothing special is happening right now.";
@@ -506,10 +582,11 @@ let lastFrame = performance.now(), panelT = 0;
 function frame(t) {
   const dtReal = Math.min(0.05, (t - lastFrame) / 1000); lastFrame = t;
   const slow = spot ? 0.5 : 1;   // slow motion while Bonsai thinks, so the moment it's reacting to stays on screen
-  if (running && !frozen && model) tick(dtReal * slow);
+  if (running && !frozen && model) { tick(dtReal * slow); arenaTick(dtReal * slow); }
   draw(dtReal);
   if (t - panelT > 400) {
     panelT = t; if (!$("pane-mind").hidden) renderMind();
+    if (mode === "arena") { $("roundInfo").textContent = `Round ${round} · ${Math.round(roundT)} / 120 s · Bonsai is playing ${C.find(c => c.brain === "bonsai")?.name}`; $("roundBar").style.width = Math.min(100, roundT / 1.2) + "%"; }
     $("perf").textContent = stats.n ? `${stats.n} ${model && model.stub ? "STUB" : "Bonsai"} decisions · ${(stats.ms / stats.n / 1000).toFixed(1)} s each · ${(stats.tok / (stats.ms / 1000)).toFixed(0)} tok/s · 0 server calls` : (model ? "Bonsai is thinking…" : "");
     $("dist").textContent = totalPicks ? `Picks: ${ACTIONS.map((a, k) => `${a} ${Math.round(picks[k] / totalPicks * 100)}%`).join(" · ")} · chose the first-listed option ${Math.round(firstPicks / totalPicks * 100)}% (chance ${Math.round(100 / ACTIONS.length)}%)${stats.invalid ? ` · ${stats.invalid} unreadable` : ""}` : "";
   }
