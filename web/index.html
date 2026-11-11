@@ -227,7 +227,7 @@ function tick(dt) {
       const sp = Math.max(0.6, c.t.speed) * (adult(c) ? 1 : 0.7) * (ageOf(c) > 6 ? 0.7 : 1); c.x += Math.sin(c.dir) * sp * dt; c.z += Math.cos(c.dir) * sp * dt; c.walk += dt * sp * 2.2; }
     else if (G.type === "eat") { const m = G.t.berries.find(m => m.visible); if (m) { m.visible = false; c.energy = Math.min(1, c.energy + 0.3); } c.think = 0; }
     else if (G.type === "mate" && G.t.alive) {
-      const mutual = G.t.plan?.action === "court" && G.t.plan.target === c.name && simT - G.t.plan.t < 40;
+      const mutual = !(G.t.plan?.action === "avoid" && G.t.plan.target === c.name);   // the courted one says no by choosing to avoid
       if (mutual && adult(c) && adult(G.t) && c.energy > 0.45 && G.t.energy > 0.45 && simT - G.t.mateT > DAY * 0.6 && simT - c.mateT > DAY * 0.6 && C.filter(o => o.alive).length + eggs.length < POP_MAX) { c.mateT = G.t.mateT = simT; c.energy -= 0.22; G.t.energy -= 0.22; layEgg(c, G.t); c.plan = G.t.plan = null; c.think = 0; }
       else if (!G.t.courtedBy || G.t.courtedBy.name !== c.name || simT - G.t.courtedBy.t > 15) { G.t.courtedBy = { name: c.name, t: simT }; wantTurn(G.t, `${c.name} came close and is courting you.`); }
     }
@@ -298,7 +298,7 @@ async function wanderer() { if (wanderer.busy) return; wanderer.busy = true; con
 
 // ===================== minds: one model, a private mind per creature =====================
 const ACTS = ["eat", "explore", "rest", "follow", "court", "avoid", "share"];
-const ACT_TXT = { eat: "eat (go to berries)", explore: "explore", rest: "rest (saves energy)", follow: "follow NAME", court: "court NAME (you only have a baby if you court each other)", avoid: "avoid NAME", share: "share NAME (give them some of your energy)" };
+const ACT_TXT = { eat: "eat (go to berries)", explore: "explore", rest: "rest (saves energy)", follow: "follow NAME", court: "court NAME (have a baby together, unless they avoid you)", avoid: "avoid NAME", share: "share NAME (give them some of your energy)" };
 const urgent = []; let mindStats = { n: 0, firstPick: 0, t0: 0 };
 function wantTurn(c, why) { if (!c.alive) return; const e = urgent.find(u => u.c === c); if (e) e.why = why; else urgent.push({ c, why }); }
 function shuffle(a) { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [b[i], b[j]] = [b[j], b[i]]; } return b; }
@@ -308,7 +308,7 @@ function mindPrompt(c, why, order) {
   const berries = bushes.filter(b => ripe(b) && Math.hypot(b.x - c.x, b.z - c.z) < c.t.sight).length;
   const who = near.length ? near.map(o => `- ${o.name}: ${bodyWords(o.g)}; "${o.personality}"; ${adult(o) ? "adult" : "baby"}, looks ${feelFood(o.energy)}${o.parents.includes(c.name) ? ", YOUR CHILD" : c.parents.includes(o.name) ? ", YOUR PARENT" : ""}${o.plan?.target === c.name ? `, wants to ${o.plan.action} you` : ""}`).join("\n") : "- nobody nearby";
   return `You are ${c.name}, a creature on a small island. Your body: ${bodyWords(c.g)}. Your personality: ${c.personality}.
-You are ${adult(c) ? "an adult" : "a baby"}, ${ageOf(c).toFixed(1)} days old (creatures live about 7 days). You feel ${feelFood(c.energy)}. ${berries ? `${berries} berry bushes in sight.` : "No berries in sight."} You have ${c.kids} children.
+You are ${adult(c) ? "an adult" : "a baby"}, ${ageOf(c).toFixed(1)} days old (creatures live about 7 days). You feel ${feelFood(c.energy)}. ${berries ? `${berries} berry bushes in sight.` : "No berries in sight."} You have ${c.kids} children.${adult(c) && c.energy > 0.55 && simT - c.mateT > DAY * 0.6 ? " You feel ready to start a family, if you find someone you like." : ""}
 Creatures you can see:
 ${who}
 Recent memories: ${c.events.length ? c.events.join("; ") : "none"}.
