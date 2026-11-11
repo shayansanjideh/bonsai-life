@@ -1,0 +1,65 @@
+<!doctype html><meta charset="utf-8"><title>Surgeon test</title><pre id="o">running</pre>
+<script type="module">
+// Exercises Surgeon's WGSL on a real WebGPU device against fake weight packs laid out like vendor/bonsai.mjs.
+import { Surgeon } from "../web/brain-engine.mjs";
+const log = [], ok = (c, m) => { log.push((c ? "PASS " : "FAIL ") + m); if (!c) window.failed = true; };
+const adapter = await navigator.gpu.requestAdapter(), device = await adapter.requestDevice();
+const U = GPUBufferUsage;
+function buf(words) { const b = device.createBuffer({ size: words.byteLength, usage: U.STORAGE | U.COPY_DST | U.COPY_SRC }); device.queue.writeBuffer(b, 0, words); return b; }
+async function read(b) { const st = device.createBuffer({ size: b.size, usage: U.MAP_READ | U.COPY_DST }); const e = device.createCommandEncoder(); e.copyBufferToBuffer(b, 0, st, 0, b.size); device.queue.submit([e.finish()]); await st.mapAsync(GPUMapMode.READ); const a = new Uint32Array(st.getMappedRange().slice(0)); st.unmap(); return a; }
+const config = { blockCount: 3, layers: ["linear", "linear", "full"] };
+const names = [];
+for (let L = 0; L < 3; L++) for (const b of (config.layers[L] === "full" ? ["attn_q", "attn_k", "attn_v", "attn_output"] : ["attn_qkv", "attn_gate", "ssm_out"]).concat(["ffn_gate", "ffn_up", "ffn_down"])) names.push(`blk.${L}.${b}.weight`);
+let seed = 12345; const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0);
+// random nonzero f16-ish scales with random low halves
+for (const format of ["lut2", "ptq1"]) {
+  const place = new Map(); let off = 64; // leave a gap at the start to test windowing
+  for (const n of names) { const groups = 2 * (3 + (rnd() % 400)); place.set(n, format === "lut2" ? { packIndex: 0, blockOffset: off * 4, blockCount: groups * 4 } : { packIndex: 0, sbOffset: off, sbCount: groups }); off += groups + 8 * (rnd() % 3); }
+  const nWords = format === "lut2" ? (off * 4) / 8 + 16 : off * 7 + 16;
+  const init = Uint32Array.from({ length: nWords }, () => (rnd() | 0x3c003c00) & 0x7fff7fff);
+  const b = buf(init);
+  const weights = format === "lut2" ? { format, lut2Packs: [{ scales: b, bits: null }], lut2Placement: place } : { format, ptq1: { packs: [{ buffer: b }], placement: place } };
+  const s = new Surgeon(device, weights, config);
+  ok(s.tensors.length === names.length, `${format}: found ${s.tensors.length} tensors`);
+  // word index helpers: which words belong to which tensor, and what halves are scales
+  const scaleSlots = new Map(); // wordIndex -> [halves that are scales]
+  for (const n of names) { const p = place.get(n);
+    if (format === "lut2") for (let w = p.blockOffset / 8; w < (p.blockOffset + p.blockCount) / 8; w++) scaleSlots.set(w, { n, halves: [0, 1] });
+    else for (let k = 0; k < p.sbCount; k++) scaleSlots.set((p.sbOffset + k) * 7 + 6, { n, halves: [1] }); }
+  await s.init();
+  // 1. knock out layer 1 MLP
+  await s.apply({ knock: new Set(["L1.mlp"]) });
+  let a = await read(b), bad = 0, zeroed = 0;
+  for (let i = 0; i < nWords; i++) {
+    const slot = scaleSlots.get(i), target = slot && /^blk\.1\.ffn_/.test(slot.n);
+    if (!target) { if (a[i] !== init[i]) bad++; continue; }
+    const exp = format === "lut2" ? 0 : (init[i] & 0xffff);
+    if (a[i] !== exp) bad++; else zeroed++;
+  }
+  ok(bad === 0 && zeroed > 0, `${format}: knockout L1.mlp touched only its scales (${zeroed} words zeroed, ${bad} wrong)`);
+  // 2. restore
+  await s.restore(); a = await read(b);
+  ok(a.every((v, i) => v === init[i]), `${format}: restore is bit-exact`);
+  // 3. random 30% zero
+  await s.apply({ random: 0.3, seed: 5 }); a = await read(b);
+  let groups = 0, hit = 0; bad = 0;
+  for (let i = 0; i < nWords; i++) { const slot = scaleSlots.get(i);
+    if (!slot) { if (a[i] !== init[i]) bad++; continue; }
+    for (const h of [0, 1]) { const got = (a[i] >>> (16 * h)) & 0xffff, orig = (init[i] >>> (16 * h)) & 0xffff;
+      if (slot.halves.includes(h)) { groups++; if (got === 0) hit++; else if (got !== orig) bad++; } else if (got !== orig) bad++; } }
+  ok(bad === 0 && Math.abs(hit / groups - 0.3) < 0.03, `${format}: random 30% zeroed ${(100 * hit / groups).toFixed(1)}% of ${groups} groups, ${bad} corrupted`);
+  ok(Math.abs(s.damagedFraction({ random: 0.3 }) - 0.3) < 1e-9, `${format}: damagedFraction(30%)`);
+  // 4. switch the same pattern to flip, then knock + random mixed
+  await s.apply({ random: 0.3, seed: 5, mode: "flip" }); a = await read(b); bad = 0; let flipped = 0;
+  for (let i = 0; i < nWords; i++) { const slot = scaleSlots.get(i); if (!slot) continue;
+    for (const h of slot.halves) { const got = (a[i] >>> (16 * h)) & 0xffff, orig = (init[i] >>> (16 * h)) & 0xffff; if (got === (orig ^ 0x8000)) flipped++; else if (got !== orig) bad++; } }
+  ok(bad === 0 && Math.abs(flipped / groups - 0.3) < 0.03, `${format}: flip mode flipped ${(100 * flipped / groups).toFixed(1)}%, ${bad} wrong`);
+  await s.apply({ knock: new Set(["L2.mixer"]), random: 0.1, seed: 9 });
+  await s.restore(); a = await read(b);
+  ok(a.every((v, i) => v === init[i]), `${format}: restore after mixed edits is bit-exact`);
+  // 5. readWords helper agrees
+  const t0 = s.tensors[0], w0 = await s.readWords(t0);
+  ok(w0.length === t0.nWords, `${format}: readWords length`);
+}
+document.getElementById("o").textContent = log.join("\n"); window.done = log;
+</script>
