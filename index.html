@@ -55,7 +55,7 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
 .veil p{color:var(--muted);max-width:460px;margin:0}
 .prog{width:min(360px,80%);height:6px;background:#1c2433;border-radius:99px;overflow:hidden} .prog>div{height:100%;width:0;background:var(--accent);transition:width .2s}
 .hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
-.label{position:fixed;pointer-events:none;transform:translate(-50%,-100%);font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
+.label{position:fixed;pointer-events:none;transform:translate(-50%,-100%);text-align:center;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
 .label.sel{font-size:14px;color:var(--accent)}
 @media (max-width:900px){ .side{top:auto;height:46vh;width:auto;left:16px} .hud{max-width:calc(100vw - 32px)} .hint{display:none} }
 </style>
@@ -65,7 +65,7 @@ input[type=text]{flex:1;min-width:0;background:var(--panel2);border:1px solid va
 <canvas id="c"></canvas>
 <div id="labels"></div>
 <div class="hud">
-  <div class="title"><h1>Bonsai Island</h1><p>Every creature's body is its genes. Babies mix their parents' bodies and mutate. Bonsai 2B, a 0.4 GB AI running on your GPU in this tab, names each newborn, gives it a personality, and talks for it when you walk up and say hi.</p><p style="margin-top:4px;font-size:11px">Earlier experiments: <a href="generations.html" style="color:inherit">generations</a> · <a href="village.html" style="color:inherit">village</a> · <a href="secret.html" style="color:inherit">secret messages</a> · <a href="brain.html" style="color:inherit">brain explorer</a></p></div>
+  <div class="title"><h1>Bonsai Island</h1><p>Every creature has its own mind, all run by one Bonsai 2B (a 0.4 GB AI on your GPU, in this tab): each one decides who to court, follow, avoid or feed. Bodies are genes: babies mix their parents' bodies and mutate. Walk up to anyone and say hi.</p><p style="margin-top:4px;font-size:11px">Earlier experiments: <a href="generations.html" style="color:inherit">generations</a> · <a href="village.html" style="color:inherit">village</a> · <a href="secret.html" style="color:inherit">secret messages</a> · <a href="brain.html" style="color:inherit">brain explorer</a></p></div>
   <div class="row"><span id="status" class="status">Bonsai: loading…</span>
     <button id="play" class="primary">Pause</button><button id="speed">Speed 1×</button><button id="feast">Grow food</button><button id="reset">New island</button></div>
   <div class="chipbar"><span>Day <b id="kDay">1</b></span><span>Alive <b id="kPop">0</b></span><span>Generation <b id="kGen">0</b></span><span>Body types <b id="kTypes">0</b></span><span id="perf"></span></div>
@@ -205,21 +205,33 @@ function tick(dt) {
   for (const c of live) {
     c.think -= dt;
     if (c.think <= 0) {
-      c.think = 0.6 + rnd() * 0.4;
-      const grown = adult(c);
-      const mate = grown && c.energy > 0.65 && simT - c.mateT > DAY * 0.8 && live.length + eggs.length < POP_MAX ? live.filter(o => o !== c && adult(o) && o.energy > 0.55 && simT - o.mateT > DAY * 0.8 && Math.abs(((o.g.hue - c.g.hue + 540) % 360) - 180) < 70 && Math.hypot(o.x - c.x, o.z - c.z) < c.t.sight * 1.5).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0] : null;
+      c.think = 0.5;
+      const P = c.plan || { action: "explore" }, T = P.target ? C.find(o => o.alive && o.name === P.target) : null;
       const food = bushes.filter(b => ripe(b) && Math.hypot(b.x - c.x, b.z - c.z) < c.t.sight).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
-      if (mate) c.goal = { type: "mate", t: mate };
-      else if (food && c.energy < 0.9) c.goal = { type: "eat", t: food };
-      else if (!c.goal || c.goal.type !== "wander" || rnd() < 0.15) c.goal = { type: "wander", x: clamp(c.x + (rnd() - .5) * 20, -WORLD, WORLD), z: clamp(c.z + (rnd() - .5) * 20, -WORLD, WORLD) };
+      if (c.energy < 0.22 && food) c.goal = { type: "eat", t: food, reflex: true };          // starving reflex, between thoughts
+      else if (P.action === "eat") c.goal = food ? { type: "eat", t: food } : { type: "wander", x: clamp(c.x + (rnd() - .5) * 30, -WORLD, WORLD), z: clamp(c.z + (rnd() - .5) * 30, -WORLD, WORLD) };
+      else if (P.action === "rest") c.goal = { type: "rest" };
+      else if (P.action === "court" && T) c.goal = { type: "mate", t: T };
+      else if (P.action === "follow" && T) c.goal = { type: "follow", t: T };
+      else if (P.action === "share" && T) c.goal = { type: "share", t: T };
+      else if (P.action === "avoid" && T) c.goal = { type: "flee", t: T };
+      else if (!c.goal || c.goal.type !== "wander" || rnd() < 0.1) c.goal = { type: "wander", x: clamp(c.x + (rnd() - .5) * 26, -WORLD, WORLD), z: clamp(c.z + (rnd() - .5) * 26, -WORLD, WORLD) };
     }
     const G = c.goal; let tx = G.x, tz = G.z; if (G.t) { tx = G.t.x; tz = G.t.z; }
+    if (G.type === "flee") { tx = 2 * c.x - G.t.x; tz = 2 * c.z - G.t.z; }
+    if (G.type === "rest") { tx = c.x; tz = c.z; }
     const dx = tx - c.x, dz = tz - c.z, d = Math.hypot(dx, dz);
-    let moving = d > (G.type === "eat" ? c.t.reach : G.type === "mate" ? 2.2 * c.g.size : 0.5);
+    let moving = d > (G.type === "eat" ? c.t.reach : G.type === "mate" || G.type === "share" ? 2.2 * c.g.size : G.type === "follow" ? 4 : 0.5);
     if (moving) { const want = Math.atan2(dx, dz); let da = ((want - c.dir + Math.PI * 3) % (Math.PI * 2)) - Math.PI; c.dir += clamp(da, -dt * 3, dt * 3);
       const sp = Math.max(0.6, c.t.speed) * (adult(c) ? 1 : 0.7) * (ageOf(c) > 6 ? 0.7 : 1); c.x += Math.sin(c.dir) * sp * dt; c.z += Math.cos(c.dir) * sp * dt; c.walk += dt * sp * 2.2; }
     else if (G.type === "eat") { const m = G.t.berries.find(m => m.visible); if (m) { m.visible = false; c.energy = Math.min(1, c.energy + 0.3); } c.think = 0; }
-    else if (G.type === "mate" && G.t.alive && simT - G.t.mateT > DAY * 0.8 && simT - c.mateT > DAY * 0.8) { c.mateT = G.t.mateT = simT; c.energy -= 0.25; G.t.energy -= 0.25; layEgg(c, G.t); c.think = 0; }
+    else if (G.type === "mate" && G.t.alive) {
+      const mutual = G.t.plan?.action === "court" && G.t.plan.target === c.name && simT - G.t.plan.t < 40;
+      if (mutual && adult(c) && adult(G.t) && c.energy > 0.45 && G.t.energy > 0.45 && simT - G.t.mateT > DAY * 0.6 && simT - c.mateT > DAY * 0.6 && C.filter(o => o.alive).length + eggs.length < POP_MAX) { c.mateT = G.t.mateT = simT; c.energy -= 0.22; G.t.energy -= 0.22; layEgg(c, G.t); c.plan = G.t.plan = null; c.think = 0; }
+      else if (!G.t.courtedBy || G.t.courtedBy.name !== c.name || simT - G.t.courtedBy.t > 15) { G.t.courtedBy = { name: c.name, t: simT }; wantTurn(G.t, `${c.name} came close and is courting you.`); }
+    }
+    else if (G.type === "share" && G.t.alive && simT - (c.shareT || 0) > 3) { const give = Math.min(0.15, c.energy - 0.3); if (give > 0) { c.shareT = simT; c.energy -= give; G.t.energy = Math.min(1, G.t.energy + give); remember(G.t, `${c.name} shared food with me`); remember(c, `I shared food with ${G.t.name}`); story(`${c.name} shared food with ${G.t.name}.`, "birth"); } c.plan = null; }
+    if (G.type === "rest") moving = false;
     const r = Math.hypot(c.x, c.z); if (r > WORLD) { c.x *= WORLD / r; c.z *= WORLD / r; }
     c.energy -= c.t.cost * (moving ? 1 : 0.45) * (adult(c) ? 1 : 0.7) * dt;
     if (c.energy <= 0) die(c, "of hunger"); else if (ageOf(c) > 7 + (c.id % 5) * 0.4) die(c, "of old age");
@@ -283,6 +295,49 @@ async function founders() {
 }
 async function wanderer() { if (wanderer.busy) return; wanderer.busy = true; const g = randomGenome(); const c = spawn({ g, name: fallbackName(), personality: "a lost traveller from across the sea", age: 1.5 }); story(`${c.name} washed up on the shore.`, "god"); wanderer.busy = false; }
 
+// ===================== minds: one model, a private mind per creature =====================
+const ACTS = ["eat", "explore", "rest", "follow", "court", "avoid", "share"];
+const ACT_TXT = { eat: "eat (go to berries)", explore: "explore", rest: "rest (saves energy)", follow: "follow NAME", court: "court NAME (you only have a baby if you court each other)", avoid: "avoid NAME", share: "share NAME (give them some of your energy)" };
+const urgent = []; let mindStats = { n: 0, firstPick: 0, t0: 0 };
+function wantTurn(c, why) { if (!c.alive) return; const e = urgent.find(u => u.c === c); if (e) e.why = why; else urgent.push({ c, why }); }
+function shuffle(a) { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function mindPrompt(c, why, order) {
+  const near = C.filter(o => o.alive && o !== c && Math.hypot(o.x - c.x, o.z - c.z) < c.t.sight * 1.4).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)).slice(0, 5);
+  const berries = bushes.filter(b => ripe(b) && Math.hypot(b.x - c.x, b.z - c.z) < c.t.sight).length;
+  const who = near.length ? near.map(o => `- ${o.name}: ${bodyWords(o.g)}; "${o.personality}"; ${adult(o) ? "adult" : "baby"}, energy ${Math.round(o.energy * 100)}%${o.parents.includes(c.name) ? ", YOUR CHILD" : c.parents.includes(o.name) ? ", YOUR PARENT" : ""}${o.plan?.target === c.name ? `, wants to ${o.plan.action} you` : ""}`).join("\n") : "- nobody nearby";
+  return `You are ${c.name}, a creature on a small island. Your body: ${bodyWords(c.g)}. Your personality: ${c.personality}.
+You are ${adult(c) ? "an adult" : "a baby"}, ${ageOf(c).toFixed(1)} days old (creatures live about 7 days). Energy ${Math.round(c.energy * 100)}%${c.energy < 0.35 ? " (very hungry)" : ""}. ${berries ? `${berries} berry bushes in sight.` : "No berries in sight."} You have ${c.kids} children.
+Creatures you can see:
+${who}
+Recent memories: ${c.events.length ? c.events.join("; ") : "none"}.
+What just happened: ${why}
+Choose what to do next, true to your personality. Options (in no particular order): ${order.map(a => ACT_TXT[a]).join("; ")}.
+Reply with only JSON: {"action": "<one option word>", "target": "<a name you can see, or empty>", "thought": "<your private thought, under 12 words>"}`;
+}
+async function mindLoop() {
+  mindStats.t0 = performance.now();
+  while (true) {
+    if (!running || !started) { await sleep(300); continue; }
+    const live = C.filter(c => c.alive); if (!live.length) { await sleep(300); continue; }
+    let pick = null, why = "Nothing special is happening.";
+    const u = urgent.findIndex(e => e.c.alive); if (u >= 0) { pick = urgent[u].c; why = urgent[u].why; urgent.splice(u, 1); }
+    else if (selected?.alive && simT - (selected.mindT ?? -99) > 6) pick = selected;
+    else pick = live.sort((a, b) => (a.mindT ?? -99) - (b.mindT ?? -99))[0];
+    const order = shuffle(ACTS), c = pick; c.thinking = true;
+    const r = await bonsai(mindPrompt(c, why, order), 60); c.thinking = false; c.mindT = simT;
+    if (!r || !c.alive) continue;
+    const o = parseJSON(r.raw) || {}; let action = String(o.action || "").toLowerCase().split(/\s+/)[0]; let target = String(o.target || "").replace(/[^A-Za-z]/g, "");
+    if (!ACTS.includes(action)) action = "explore";
+    const T = C.find(x => x.alive && x !== c && x.name.toLowerCase() === target.toLowerCase());
+    if (["follow", "court", "avoid", "share"].includes(action) && !T) action = "explore";
+    if (action === "court" && T && !adult(T)) action = "explore";
+    mindStats.n++; if (order[0] === action) mindStats.firstPick++;
+    c.plan = { action, target: T?.name || null, t: simT }; c.thought = String(o.thought || "").slice(0, 90); c.thoughtT = performance.now(); c.think = 0;
+    if (action === "court") { remember(T, `${c.name} is courting me`); wantTurn(T, `${c.name} just started courting you.`); }
+    if (action === "avoid" && Math.random() < 0.5) remember(T, `${c.name} is avoiding me`);
+  }
+}
+
 // talking: Bonsai plays the creature you're talking to
 async function talk(text) {
   const c = selected; if (!c || !c.alive || !text) return;
@@ -292,7 +347,7 @@ async function talk(text) {
   const near = C.filter(o => o.alive && o !== c && Math.hypot(o.x - c.x, o.z - c.z) < 15).map(o => o.name);
   $("send").disabled = true; c.typing = true; renderChat();
   const r = await bonsai(`You are ${c.name}, a small creature living on an island. Your body: ${bodyWords(c.g)}. Your personality: ${c.personality}.
-You are ${ageOf(c).toFixed(1)} days old (creatures live about 7 days), generation ${c.gen}${c.parents.length ? `, child of ${c.parents.join(" and ")}` : ", one of the first creatures"}. You have ${c.kids} children. Energy: ${Math.round(c.energy * 100)}% (${c.energy < 0.35 ? "you are very hungry" : c.energy > 0.8 ? "you are well fed" : "a bit peckish"}). Right now you are ${c.goal?.type === "eat" ? "heading for berries" : c.goal?.type === "mate" ? "courting " + c.goal.t.name : "wandering"}.${near.length ? ` Nearby: ${near.join(", ")}.` : ""}
+You are ${ageOf(c).toFixed(1)} days old (creatures live about 7 days), generation ${c.gen}${c.parents.length ? `, child of ${c.parents.join(" and ")}` : ", one of the first creatures"}. You have ${c.kids} children. Energy: ${Math.round(c.energy * 100)}% (${c.energy < 0.35 ? "you are very hungry" : c.energy > 0.8 ? "you are well fed" : "a bit peckish"}). Your current plan: ${c.plan ? c.plan.action + (c.plan.target ? " " + c.plan.target : "") : "none"}${c.thought ? ` (you were thinking: "${c.thought}")` : ""}.${near.length ? ` Nearby: ${near.join(", ")}.` : ""}
 Recent memories: ${c.events.length ? c.events.join("; ") : "nothing special"}.
 A giant visitor from outside the island is talking to you.
 ${hist ? hist + "\n" : ""}Visitor: ${text}
@@ -309,7 +364,7 @@ function story(t, kind) { const e = document.createElement("div"); e.className =
 function renderWho() {
   const c = selected; if (!c) return;
   $("wName").textContent = c.name + (c.alive ? "" : " ✝"); $("wName").style.color = `hsl(${c.g.hue} 70% 65%)`;
-  $("wSub").textContent = `generation ${c.gen} · ${ageOf(c).toFixed(1)} days old · ${c.alive ? (c.goal?.type === "eat" ? "going for berries" : c.goal?.type === "mate" ? "courting " + c.goal.t.name : "wandering") : "died " + c.cause}`;
+  $("wSub").textContent = `generation ${c.gen} · ${ageOf(c).toFixed(1)} days old · ${c.alive ? (c.plan ? "plan: " + c.plan.action + (c.plan.target ? " " + c.plan.target : "") : "hasn't thought yet") + (c.thought ? ` · thinks “${c.thought}”` : "") : "died " + c.cause}`;
   $("wPers").textContent = `“${c.personality}”`;
   const show = { segments: v => `${v}-part body`, size: v => `size ${v.toFixed(1)}`, legPairs: v => `${v * 2} legs`, legLen: v => `leg length ${v.toFixed(1)}`, eyes: v => `${v} eye${v > 1 ? "s" : ""}`, horns: v => `${v} horn${v === 1 ? "" : "s"}`, tail: v => v > 0.2 ? `tail ${v.toFixed(1)}` : "no tail", crest: v => v ? "crest" : "no crest", hue: v => hueName(v), spots: v => v ? "spots" : "plain", neck: v => v > 0.6 ? "long neck" : "short neck" };
   $("wGenes").innerHTML = Object.keys(GENES).map(k => `<span class="chip">${show[k](c.g[k])}</span>`).join("");
@@ -352,12 +407,14 @@ function updateLabels() {
     const vis = v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1 && camera.position.distanceTo(c.mesh.position) < 70;
     el.style.display = vis ? "block" : "none"; if (!vis) continue;
     el.style.left = (v3.x + 1) / 2 * innerWidth + "px"; el.style.top = (1 - v3.y) / 2 * innerHeight + "px";
-    el.className = "label" + (c === selected ? " sel" : ""); el.textContent = c.name + (ageOf(c) < 1 ? " (baby)" : "");
+    el.className = "label" + (c === selected ? " sel" : ""); const showT = c.thought && (c === selected || performance.now() - (c.thoughtT || 0) < 6000);
+    el.innerHTML = esc(c.name + (ageOf(c) < 1 ? " (baby)" : "")) + (c.thinking ? ' <span style="color:#5dff96">💭…</span>' : "") + (showT ? `<div style="font-weight:400;font-style:italic;max-width:220px;white-space:normal;text-align:center;background:rgba(15,20,30,.75);border-radius:8px;padding:3px 7px;margin-top:2px">${c.plan ? esc(c.plan.action + (c.plan.target ? " " + c.plan.target : "")) + ": " : ""}“${esc(c.thought)}”</div>` : "");
   }
 }
 
 // ===================== wake Bonsai =====================
-function stub() { return { stub: true, async ask(p) { await sleep(400); const name = "Stub" + SYL[(rnd() * SYL.length) | 0]; return { raw: /Reply with only JSON/.test(p) ? JSON.stringify({ name, personality: "a stub creature from the test model" }) : "Stub reply from the test model.", ms: 400, tokens: 20 }; } }; }
+function stub() { return { stub: true, async ask(p) { await sleep(400); const name = "Stub" + SYL[(rnd() * SYL.length) | 0]; if (/"action"/.test(p)) { const names = [...p.matchAll(/^- ([A-Z][a-z]+):/gm)].map(m => m[1]); const a = ["eat", "explore", "rest", "follow", "court", "court", "avoid", "share"][(rnd() * 8) | 0]; return { raw: JSON.stringify({ action: a, target: names[0] || "", thought: "stub thought" }), ms: 400, tokens: 20 }; }
+    return { raw: /Reply with only JSON/.test(p) ? JSON.stringify({ name, personality: "a stub creature from the test model" }) : "Stub reply from the test model.", ms: 400, tokens: 20 }; } }; }
 async function wake() {
   const st = $("status"), q = new URLSearchParams(location.search);
   if (q.get("llama")) { const url = q.get("llama"); model = { llama: true }; NAT = { ask: async (m, prompt, o = {}) => { const t = performance.now(); const r = await fetch(url + "/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: prompt }], max_tokens: o.maxNewTokens || 80, temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.5, chat_template_kwargs: { enable_thinking: false } }) }); const j = await r.json(); return { raw: j.choices[0].message.content || "", ms: performance.now() - t, tokens: j.usage?.completion_tokens || 0 }; } }; $("veil").hidden = true; st.textContent = "Bonsai 2B via llama.cpp (test mode)"; st.className = "status on"; return true; }
@@ -400,14 +457,14 @@ function frame(t) {
     $("kDay").textContent = Math.floor(day()) + 1; $("kPop").textContent = L.length + (eggs.length ? ` +${eggs.length} eggs` : "");
     $("kGen").textContent = C.length ? Math.max(...C.map(c => c.gen)) : 0;
     $("kTypes").textContent = new Set(L.map(c => `${c.g.legPairs}${c.g.eyes}${c.g.horns}${c.g.segments}${c.g.crest}`)).size;
-    $("perf").textContent = stats.n ? `${stats.n} Bonsai calls · ${(stats.ms / stats.n / 1000).toFixed(1)} s each · 0 server calls` : "";
+    $("perf").textContent = stats.n ? `${stats.n} Bonsai calls · ${(stats.ms / stats.n / 1000).toFixed(1)} s each · ${mindStats.n ? Math.round(mindStats.n / ((performance.now() - mindStats.t0) / 60000)) + " decisions/min · " : ""}0 server calls` : "";
     if (selected) renderWho();
   }
   requestAnimationFrame(frame);
 }
 window.BI = { tick, get C() { return C; }, get stats() { return stats; }, select: n => { const c = C.find(c => c.name === n); if (c) { select(c); following = true; } }, talk, get started() { return started; } };
 requestAnimationFrame(frame);
-wake().then(() => founders());
+wake().then(ok => { founders(); if (model) mindLoop(); });
 </script>
 </body>
 </html>
