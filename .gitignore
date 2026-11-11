@@ -3,3 +3,4 @@ bin/
 logs/
 logs_run.txt
 __pycache__/
+kaggle-village/out*/
