@@ -1,4 +1,4 @@
-// 3D neuron cloud for neurons.html. Each dot is one sampled MLP neuron (layout from neurons.mjs NeuronMap): height is
+// 3D neuron cloud for brain.html. Each dot is one sampled MLP neuron (layout from neurons.mjs NeuronMap): height is
 // the layer, neurons that fire together sit together. For every token the dots light up layer by layer, bottom to top
 // (orange = far above its usual level, ink = above, teal = below), co-firing links between neighbouring layers glow when both ends
 // are active, and a red line traces where the activity is centred in each layer.
