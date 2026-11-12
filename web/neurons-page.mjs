@@ -143,8 +143,21 @@ new ResizeObserver(() => drawWordMap()).observe($("wm"));
 let wmT = 0; const wmSoon = () => { wmDirty = true; clearTimeout(wmT); wmT = setTimeout(drawWordMap, 120); };
 
 // ---- text ----
+// chat-template plumbing (<|im_start|>user, <think></think> and the newlines around them) is hidden from the text view
+const isTag = p => /^<\|.*\|>$/.test(p.trim()) || /^<\/?think>$/.test(p.trim());
+function hiddenToks() {
+  const h = new Set();
+  toks.forEach((t, i) => {
+    if (isTag(t.piece)) h.add(i);
+    else if (i > 0 && /<\|im_start\|>/.test(toks[i - 1].piece)) h.add(i);             // role name after <|im_start|>
+    else if (!t.piece.trim() && (h.has(i - 1) || (toks[i + 1] && isTag(toks[i + 1].piece)))) h.add(i);
+  });
+  return h;
+}
 function renderText() {
-  $("out").innerHTML = toks.map((t, i) => `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`).join("") + (busy ? '<span class="caret"></span>' : "");
+  const h = hiddenToks();
+  let lastPrompt = false;
+  $("out").innerHTML = toks.map((t, i) => { if (h.has(i)) return ""; const br = lastPrompt && !t.prompt ? "<br>" : ""; lastPrompt = t.prompt; return br + `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`; }).join("") + (busy ? '<span class="caret"></span>' : "");
 }
 $("out").onclick = e => { const el = e.target.closest(".tok"); if (!el || busy) return; focusTok(+el.dataset.i); };
 function renderNext() {
