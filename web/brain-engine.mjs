@@ -229,6 +229,68 @@ export class RealEngine {
   async start(ids) { this.m.reset(); await this.m.prefill(ids); return this.m.readLogits(); }
   async step(id) { await this.m.decodeStep(id); return this.m.readLogits(); }
   get position() { return this.m.position ?? this.m.cache?.seqLength; }
+  // Traced generation: every token (after the first) goes through decodeStep with the tracer on.
+  get traceDims() { return { L: this.cfg.blockCount, H: this.cfg.hiddenSize, F: this.cfg.ffnSize }; }
+  async startTraced(ids, onTrace) {
+    this.tracer ??= new Tracer(this.m, this.cfg);
+    this.m.reset(); await this.m.prefill(ids.slice(0, 1));
+    for (let i = 1; i < ids.length; i++) await onTrace?.(i, await this.tracer.step(ids[i]));
+    return this.m.readLogits();
+  }
+  async stepTraced(id) { const trace = await this.tracer.step(id); return { trace, logits: await this.m.readLogits() }; }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Tracer: reads what happens inside the model, one token at a time. After each layer's MLP (the `down` projection,
+// which also adds into the residual stream) it copies two GPU buffers into a capture buffer:
+//   neurons: the MLP's hidden activations silu(gate)·up, ffnSize floats (6,144 on Bonsai 2B), before rotation
+//   resid:   the residual stream after the layer, hiddenSize floats (2,048)
+// It works by wrapping the decode graph's record() so every program still runs in the same order; the copies are
+// extra commands in the same command encoder. Prefill uses a batched graph, so a traced prompt is fed one token at a
+// time through decodeStep (slower, but every token gets a trace).
+
+export class Tracer {
+  constructor(model, cfg) {
+    this.m = model; this.cfg = model.config ?? cfg; this.device = model.device;
+    this.L = this.cfg.blockCount; this.H = this.cfg.hiddenSize; this.F = this.cfg.ffnSize;
+    this.on = false; this.g = null;
+  }
+  async attach() {
+    const g = await this.m.decode();
+    if (g === this.g) return;
+    const inter = g.arena?.buffers?.find(b => b.label === "decode.intermediate");
+    if (!inter || !g.hidden?.buffer) throw new Error("tracing: this engine build has no decode.intermediate / hidden buffers");
+    const after = new Map();
+    for (const p of g.layerPrograms) { const m = /^decode\.L(\d+)\.down$/.exec(p.label ?? ""); if (m) after.set(p, +m[1]); }
+    if (after.size !== this.L) throw new Error(`tracing: found ${after.size} MLP outputs for ${this.L} layers`);
+    const row = (this.H + this.F) * 4, bytes = row * this.L;
+    this.cap?.destroy(); this.staging?.destroy();
+    this.cap = this.device.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST, label: "trace.capture" });
+    this.staging = this.device.createBuffer({ size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST, label: "trace.staging" });
+    const self = this, hid = g.hidden, H4 = this.H * 4, F4 = this.F * 4, orig = g.record;
+    g.record = function (r, n, a, s) {
+      if (!self.on) return orig.call(this, r, n, a, s);
+      const run = r.run;
+      r.run = function (prog) {
+        run.call(this, prog);
+        const L = after.get(prog);
+        if (L !== undefined) { this.copyBuffer(hid.buffer, hid.byteOffset, self.cap, L * row, H4); this.copyBuffer(inter, 0, self.cap, L * row + H4, F4); }
+      };
+      try { return orig.call(this, r, n, a, s); } finally { r.run = run; }
+    };
+    this.g = g; this.row = row; this.bytes = bytes;
+  }
+  async read() {
+    const enc = this.device.createCommandEncoder({ label: "trace.read" });
+    enc.copyBufferToBuffer(this.cap, 0, this.staging, 0, this.bytes);
+    this.device.queue.submit([enc.finish()]);
+    await this.staging.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(this.staging.getMappedRange().slice(0)); this.staging.unmap();
+    const { L, H, F } = this, neurons = new Float32Array(L * F), resid = new Float32Array(L * H), r = H + F;
+    for (let l = 0; l < L; l++) { resid.set(all.subarray(l * r, l * r + H), l * H); neurons.set(all.subarray(l * r + H, (l + 1) * r), l * F); }
+    return { neurons, resid };
+  }
+  async step(id) { await this.attach(); this.on = true; try { await this.m.decodeStep(id); } finally { this.on = false; } return this.read(); }
 }
 
 export async function loadRealEngine(opts) {
@@ -248,6 +310,7 @@ const SCRIPTS = [
   { match: /sky/i, text: "The sky looks blue because sunlight scatters off the tiny molecules in the air. Blue light has a shorter wavelength, so it scatters much more than red light, and that scattered blue reaches our eyes from every direction." },
   { match: /day/i, text: "My day was pretty good! I took a long walk in the park, had a banana for lunch, and spent the evening reading a book about the moon." },
   { match: /once upon/i, text: "Once upon a time there was a little robot who lived in a quiet town. Every morning it watered the garden and said hello to the birds." },
+  { match: /banana/i, text: "Paris is the elegant capital of France, famous for the Eiffel Tower and its quiet cafes. Tokyo is the busy capital of Japan, full of neon lights and fast trains. A banana is a soft yellow fruit that is sweet and easy to peel." },
   { match: /capital/i, text: "The capital of France is Paris." },
   { match: /cat sat/i, text: "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight." },
 ];
@@ -312,4 +375,28 @@ export class StubEngine {
   }
   async step(id) { this.ctx.push(id); await this.#wait(); return this.#logits(); }
   get position() { return this.ctx.length; }
+  // Fake traces for layout tests: each word has a random 16-d meaning, each neuron a random preference; higher layers
+  // blend in more of the recent context. Shapes are small (512 neurons, 128-d residual). Never shown as real data.
+  get traceDims() { return { L: this.layers.length, H: 128, F: 512 }; }
+  #vec(seed, n, scale = 1) { const r = mulberry(seed), v = new Float32Array(n); for (let i = 0; i < n; i++) v[i] = (r() + r() + r() - 1.5) * scale; return v; }
+  #trace() {
+    const { L, H, F } = this.traceDims, D = 16;
+    this.tw ??= { n: this.#vec(11, L * F * D), h: this.#vec(12, H * D) };
+    const n = this.ctx.length, cur = this.#vec(1000 + this.ctx[n - 1], D), ctx = new Float32Array(D);
+    for (let k = 2; k <= Math.min(6, n); k++) { const e = this.#vec(1000 + this.ctx[n - k], D); for (let d = 0; d < D; d++) ctx[d] += e[d] / k; }
+    const neurons = new Float32Array(L * F), resid = new Float32Array(L * H), x = new Float32Array(D);
+    for (let l = 0; l < L; l++) {
+      const a = l / (L - 1);
+      for (let d = 0; d < D; d++) x[d] = (1 - a) * cur[d] + a * ctx[d] * 1.6;
+      for (let j = 0; j < F; j++) { let z = 0; const o = (l * F + j) * D; for (let d = 0; d < D; d++) z += this.tw.n[o + d] * x[d]; z = z * 0.9 - 1.2; neurons[l * F + j] = z / (1 + Math.exp(-z)); }
+      for (let i = 0; i < H; i++) { let z = 0; for (let d = 0; d < D; d++) z += this.tw.h[i * D + d] * x[d]; resid[l * H + i] = z * (1 + l * 0.1); }
+    }
+    return { neurons, resid };
+  }
+  async startTraced(ids, onTrace) {
+    this.ctx = ids.slice(0, 1);
+    for (let i = 1; i < ids.length; i++) { this.ctx.push(ids[i]); await this.#wait(); await onTrace?.(i, this.#trace()); }
+    return this.start(ids);
+  }
+  async stepTraced(id) { const logits = await this.step(id); return { trace: this.#trace(), logits }; }
 }
