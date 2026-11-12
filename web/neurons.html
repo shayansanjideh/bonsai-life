@@ -13,10 +13,6 @@
 <div class="page">
   <header class="top">
     <div class="nm"><i class="sq"></i>Bonsai / Brain Explorer</div>
-    <a class="tab" href="brain.html">Layer stack</a>
-    <a class="tab on" href="neurons.html">Neuron cloud</a>
-    <a class="tab" href="brain.html#scan">Lesion scan</a>
-    <a class="tab" href="brain.html#surgery">Surgery</a>
     <div class="model">Ternary-Bonsai-2-2B · 1.58 bit · WebGPU</div>
     <div class="st"><small>Neurons</small><b id="kN">–</b></div>
     <div class="st"><small>Token</small><b id="kTok">–</b></div>
@@ -28,7 +24,7 @@
 
   <div class="grid2">
     <section class="fig panel stage">
-      <div class="hd"><b>Fig. 02</b> Neuron cloud · 24 layers<span class="r">drag to orbit · click a dot</span></div>
+      <div class="hd"><b>Fig. 01</b> Neuron cloud · 24 layers<span class="r">drag to orbit · click a dot</span></div>
       <div class="view" id="cloud"><div class="fallback" id="cloudMsg">Wake Bonsai to map its neurons.</div></div>
       <div class="ov"><h1 class="h1">Watch a <em>1.58-bit</em> brain think.</h1></div>
       <div class="ruler" id="ruler" hidden></div>
@@ -38,7 +34,7 @@
     </section>
     <div class="col">
       <section class="fig">
-        <div class="hd"><b>Fig. 03</b> Word map · PCA<span class="r">Layer <b id="wmLayerV">16</b> / <span id="wmLayerMax">23</span></span></div>
+        <div class="hd"><b>Fig. 02</b> Word map · PCA<span class="r">Layer <b id="wmLayerV">16</b> / <span id="wmLayerMax">23</span></span></div>
         <div class="bd">
           <input type="range" id="wmLayer" min="0" max="23" value="16" style="width:100%" aria-label="Layer">
           <canvas id="wm"></canvas>
@@ -46,7 +42,7 @@
         </div>
       </section>
       <section class="fig" id="nbox">
-        <div class="hd"><b>Fig. 04</b> Selected neuron<span class="r">σ above usual level</span></div>
+        <div class="hd"><b>Fig. 03</b> Selected neuron<span class="r">σ above usual level</span></div>
         <div class="bd">
           <div class="big" id="nTitle">–</div>
           <canvas id="spark"></canvas>
@@ -77,6 +73,20 @@
       <div class="bd"><div class="cands" id="live"></div></div>
     </section>
   </div>
+
+  <section class="fig" id="surgery">
+    <div class="hd"><b>Fig. 04</b> Surgery<span class="r">click a block to switch it off · then Generate again</span></div>
+    <div class="bd">
+      <div class="brain" id="brain"></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Weights off</div><div class="v" id="mOff">0%</div></div>
+        <div class="stat"><div class="k">Loss now, nats</div><div class="v" id="mLoss">–</div></div>
+        <div class="stat"><div class="k">Intact, nats</div><div class="v" id="mLoss0">–</div></div>
+      </div>
+      <div class="keys"><button id="btnRestore" disabled>Restore all</button><span class="kv" id="surgMsg">Mixer blocks mix words together (A = full attention); MLP blocks hold the neurons above.</span></div>
+      <p class="hint">Switching a block off zeroes the scale shared by each group of 128 of its ternary weights, right in GPU memory, so the whole block counts as 0. Restore puts back the exact original bytes. Loss is the average surprise per word on a fixed paragraph of easy facts, so lower is smarter. The cloud keeps comparing against the intact model, so damage shows up as dots far from their usual level, and a switched-off MLP layer goes quiet (its ring turns orange).</p>
+    </div>
+  </section>
 
   <section class="fig">
     <div class="hd"><b>Notes</b> What you're looking at</div>
