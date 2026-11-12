@@ -44,7 +44,7 @@
       <section class="fig" id="nbox">
         <div class="hd"><b>Fig. 03</b> Selected neuron<span class="r">σ above usual level</span></div>
         <div class="bd">
-          <div class="big" id="nTitle">–</div>
+          <div class="big" id="nTitle" hidden></div>
           <canvas id="spark"></canvas>
           <div class="hint" id="nHint">Click a dot in the cloud to follow one neuron.</div>
           <div class="tb" id="nToks"></div>
@@ -84,7 +84,7 @@
         <div class="stat"><div class="k">Intact, nats</div><div class="v" id="mLoss0">–</div></div>
       </div>
       <div class="keys"><button id="btnRestore" disabled>Restore all</button><span class="kv" id="surgMsg">Mixer blocks mix words together (A = full attention); MLP blocks hold the neurons above.</span></div>
-      <p class="hint">Switching a block off zeroes the scale shared by each group of 128 of its ternary weights, right in GPU memory, so the whole block counts as 0. Restore puts back the exact original bytes. Loss is the average surprise per word on a fixed paragraph of easy facts, so lower is smarter. The cloud keeps comparing against the intact model, so damage shows up as dots far from their usual level, and a switched-off MLP layer goes quiet (its ring turns orange).</p>
+      <p class="hint">Switching a block off zeroes the scale shared by each group of 128 of its ternary weights, right in GPU memory, so the whole block counts as 0. Restore puts back the exact original bytes. Loss is the average surprise per token on a fixed paragraph of easy facts, so lower is smarter. The cloud keeps comparing against the intact model, so damage shows up as dots far from their usual level, and a switched-off MLP layer goes quiet (its ring turns orange).</p>
     </div>
   </section>
 

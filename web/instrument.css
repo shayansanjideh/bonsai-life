@@ -93,7 +93,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:10px;border:0;border-radiu
 .out{white-space:pre-wrap;word-break:break-word;font-size:21px;line-height:1.5;letter-spacing:-.01em;min-height:96px;max-height:340px;overflow:auto}
 .out .prompt{color:var(--mut)}
 .out .prompt::before{content:"> "}
-.tok{cursor:pointer;padding:0 1px}
+.tok{cursor:pointer}
 .tok.sel,.tok.cur{background:var(--or);color:#fff}
 .tok.pr{color:var(--mut)}
 .tok.forked{text-decoration:underline;text-decoration-color:var(--or);text-decoration-thickness:2px;text-underline-offset:4px}
@@ -108,7 +108,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:10px;border:0;border-radiu
   background:transparent;box-shadow:none;border-radius:0;text-align:left;font:400 14.5px var(--font);color:var(--ink);cursor:pointer;width:100%}
 .cand:active:not(:disabled){transform:none}
 .cand .n{color:var(--mut)}
-.cand .t{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cand .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cand .track{height:10px;position:relative}
 .cand .bar{position:absolute;inset:0;transform-origin:left;background:repeating-linear-gradient(90deg,var(--ink) 0 3px,transparent 3px 5px);transition:transform 200ms var(--ease-out)}
 .cand:first-child .bar,.cand.chosen .bar{background:repeating-linear-gradient(90deg,var(--or) 0 3px,transparent 3px 5px)}

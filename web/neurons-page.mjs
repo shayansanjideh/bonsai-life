@@ -6,6 +6,8 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const show = p => p.replace(/\n/g, "↵").replace(/^ /, "·") || "∅";
+// How a token is named in labels: the word itself, with blank and special tokens spelled out so nothing looks cut off.
+const label = p => p.trim() ? (/^<\|im_end\|>$|^<\|endoftext\|>$/.test(p.trim()) ? "(end of answer)" : p.trim()) : p.includes("\n") ? "(new line)" : p ? "(space)" : "(empty)";
 const tip = $("tip");
 function setStatus(t, cls = "") { const s = $("status"); s.textContent = t; s.className = "status " + cls; }
 
@@ -86,10 +88,11 @@ function drawRuler(r) {
   const clear = y => !hb || cb.top + y > hb.bottom + 6 || cb.left + r.x - 40 > hb.right + 6;   // keep labels off the headline
   el.innerHTML = r.ys.map((y, l) => `<span class="${(l % 4 === 0 || l === r.ys.length - 1) && clear(y) ? "l" : ""}" data-l="L${String(l).padStart(2, "0")}" style="top:${y + 28 - top}px"></span>`).join("");
 }
+addEventListener("scroll", () => { tip.style.display = "none"; }, { passive: true });
 function onHover(h) {
   if (!h) { tip.style.display = "none"; return; }
   const t = toks[cur], z = t ? t.z[h.s] : null;
-  tip.innerHTML = `<b>Layer ${h.layer} · neuron ${h.neuron}</b>${z !== null ? `<br>${z >= 0 ? "+" : ""}${z.toFixed(1)}σ vs usual on “${esc(show(t.piece))}”` : ""}<br><span style="color:var(--muted)">click to follow it</span>`;
+  tip.innerHTML = `<b>Layer ${h.layer} · neuron ${h.neuron}</b>${z !== null ? `<br>${z >= 0 ? "+" : ""}${z.toFixed(1)}σ vs usual on “${esc(label(t.piece))}”` : ""}<br><span style="color:var(--muted)">click to follow it</span>`;
   tip.style.display = "block"; tip.style.left = Math.min(innerWidth - 280, h.x + 14) + "px"; tip.style.top = h.y + 16 + "px";
 }
 function onPick(p) { picked = p ? p.s : -1; renderNeuron(); }
@@ -97,21 +100,30 @@ function onPick(p) { picked = p ? p.s : -1; renderNeuron(); }
 function renderNeuron() {
   const c = $("spark"), g = c.getContext("2d"), w = c.width = c.clientWidth * devicePixelRatio, h = c.height = c.clientHeight * devicePixelRatio;
   g.clearRect(0, 0, w, h);
-  if (picked < 0) { $("nTitle").textContent = "–"; $("nToks").innerHTML = ""; $("nHint").textContent = "Click a dot in the cloud to follow one neuron."; return; }
+  $("nTitle").hidden = picked < 0;
+  if (picked < 0) { $("nToks").innerHTML = ""; $("nHint").textContent = "Click a dot in the cloud to follow one neuron."; return; }
   const d = map.describe(picked); $("nTitle").innerHTML = `L${String(d.layer).padStart(2, "0")} <span>/</span> N${d.neuron}`;
   if (!toks.length) { $("nHint").textContent = "Generate some text to see what makes it fire."; $("nToks").innerHTML = ""; return; }
   const zs = toks.map(t => t.z[picked]), m = Math.max(3, ...zs.map(Math.abs));
   g.fillStyle = "#c9d0d4"; g.fillRect(0, h * 0.6, w, 1);
   const bw = w / zs.length, base = h * 0.6;
+  if (cur >= 0) { g.fillStyle = "rgba(255,90,31,.22)"; g.fillRect(cur * bw, 0, Math.max(2, bw), h); }   // band marks the selected word
   zs.forEach((z, i) => { const bh = z > 0 ? (z / m) * (base - 2) : (z / m) * (h - base - 2); g.fillStyle = z >= 1.9 ? "#ff5a1f" : z > 0 ? "#12161a" : "#9aa4aa"; g.fillRect(i * bw + 0.5, base - Math.max(0, bh), Math.max(1, bw - 1.5), Math.max(1, Math.abs(bh))); });
-  if (cur >= 0) { g.fillStyle = "#ff5a1f"; g.fillRect(cur * bw, h - 3 * devicePixelRatio, Math.max(2, bw), 3 * devicePixelRatio); }   // marks the selected word
+
   const top = toks.map((t, i) => ({ t, z: zs[i] })).sort((a, b) => b.z - a.z).slice(0, 6).filter(x => x.z > 0.5);
   $("nHint").textContent = top.length ? "Words in the text that make it fire most:" : "It hasn't fired well above its usual level on this text yet.";
-  $("nToks").innerHTML = top.map(x => `<div><span>${esc(x.t.piece.trim() || show(x.t.piece))}</span><em>+${x.z.toFixed(1)}σ</em></div>`).join("");
+  $("nToks").innerHTML = top.map(x => `<div><span>${esc(label(x.t.piece))}</span><em>+${x.z.toFixed(1)}σ</em></div>`).join("");
 }
 
 // ---- word map (2D canvas) ----
 let wmPts = [], wmDirty = true;
+// The whole word a token belongs to ("Eiff" + "el" reads "Eiffel"); "" for the later pieces, so a word is labelled once.
+function wordAt(i) {
+  const joins = k => k > 0 && toks[k] && toks[k - 1] && toks[k].prompt === toks[k - 1].prompt && /^[\p{L}\p{N}]/u.test(toks[k].piece) && /[\p{L}\p{N}]$/u.test(toks[k - 1].piece);
+  if (!toks[i]) return ""; if (joins(i)) return i === cur ? toks[i].piece.trim() : "";
+  let w = toks[i].piece; for (let k = i + 1; joins(k); k++) w += toks[k].piece;
+  return w.trim();
+}
 function drawWordMap() {
   const c = $("wm"), g = c.getContext("2d"), dpr = devicePixelRatio, w = c.width = c.clientWidth * dpr, h = c.height = c.clientHeight * dpr;
   g.clearRect(0, 0, w, h);
@@ -129,13 +141,16 @@ function drawWordMap() {
     g.beginPath(); g.arc(X(p.x), Y(p.y), (isCur ? 4.5 : 2.4) * dpr, 0, 7); g.fill();
   }
   // labels: current word first, then the model's own words, then the prompt; skip any that would overlap
+  const dots = wmPts.map((p, i) => [X(p.x), Y(p.y), i]);
   const boxes = [], fs = 12.5 * dpr, lab = wmPts.map((p, i) => i).sort((a, b) => (wmPts[b].meta === cur) - (wmPts[a].meta === cur) || (toks[wmPts[a].meta]?.prompt ? 1 : 0) - (toks[wmPts[b].meta]?.prompt ? 1 : 0));
   for (const i of lab) {
-    const p = wmPts[i], isCur = p.meta === cur, txt = p.text.trim().slice(0, 14); if (!txt) continue;
+    const p = wmPts[i], isCur = p.meta === cur, txt = wordAt(p.meta).slice(0, 16); if (!txt) continue;
     g.font = font(isCur ? 600 : 400, 12.5);
-    const x = X(p.x) + 7 * dpr, y = Y(p.y) + 4 * dpr, bw = g.measureText(txt).width, bx = [x - 1, y - fs, x + bw + 1, y + 3];
-    if (!isCur && boxes.some(o => bx[0] < o[2] && bx[2] > o[0] && bx[1] < o[3] && bx[3] > o[1])) continue;
-    boxes.push(bx); g.fillStyle = isCur ? "#ff5a1f" : toks[p.meta]?.prompt ? "#6c757d" : "#12161a";
+    const bw = g.measureText(txt).width, y = Y(p.y) + 4 * dpr;
+    const x = X(p.x) + 7 * dpr + bw > w - 2 * dpr ? X(p.x) - 7 * dpr - bw : X(p.x) + 7 * dpr;   // flip to the left of the dot at the right edge
+    const bx = [x - 1, y - fs, x + bw + 1, y + 3];
+    if (!isCur && (boxes.some(o => bx[0] < o[2] && bx[2] > o[0] && bx[1] < o[3] && bx[3] > o[1]) || dots.some(d => d[2] !== i && d[0] > bx[0] - 3 * dpr && d[0] < bx[2] + 3 * dpr && d[1] > bx[1] - 3 * dpr && d[1] < bx[3] + 3 * dpr))) continue;
+    boxes.push(bx); g.lineJoin = "round"; g.lineWidth = 4 * dpr; g.strokeStyle = "#f2f5f4"; g.strokeText(txt, x, y); g.fillStyle = isCur ? "#ff5a1f" : toks[p.meta]?.prompt ? "#6c757d" : "#12161a";
     g.fillText(txt, x, y);
   }
 }
@@ -171,12 +186,12 @@ $("out").onclick = e => { const el = e.target.closest(".tok"); if (!el || busy) 
 function renderNext() {
   const t = toks[cur], el = $("live");
   if (!t || !t.cands) { el.innerHTML = `<p class="hint">${t ? "This is a prompt word, so the model didn't choose it." : "Generate to see the top 5 choices at each word."}</p>`; return; }
-  el.innerHTML = t.cands.map((c, k) => `<div class="cand static${c.id === t.id ? " chosen" : ""}"><span class="n">${String(k + 1).padStart(2, "0")}</span><span class="t">${esc(show(eng.piece(c.id)))}</span><span class="track"><span class="bar" style="transform:scaleX(${c.p.toFixed(4)})"></span></span><span class="p">${(c.p * 100).toFixed(1)}%</span></div>`).join("");
+  el.innerHTML = t.cands.map((c, k) => `<div class="cand static${c.id === t.id ? " chosen" : ""}"><span class="n">${String(k + 1).padStart(2, "0")}</span><span class="t">${esc(label(eng.piece(c.id)))}</span><span class="track"><span class="bar" style="transform:scaleX(${c.p.toFixed(4)})"></span></span><span class="p">${(c.p * 100).toFixed(1)}%</span></div>`).join("");
 }
 function focusTok(i, ms) {
   cur = i; const t = toks[i]; if (!t) return; renderNext();
   cloud?.show(t.z, t.path, { ms: ms ?? ($("slow").checked ? 2400 : 650) });
-  $("kTok").textContent = show(t.piece).trim().slice(0, 12) || "·";
+  $("kTok").textContent = label(t.piece).slice(0, 14);
   for (const el of $("out").querySelectorAll(".tok")) el.classList.toggle("cur", +el.dataset.i === i);
   drawWordMap(); renderNeuron();
 }
