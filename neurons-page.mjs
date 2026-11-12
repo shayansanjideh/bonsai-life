@@ -102,7 +102,8 @@ function renderNeuron() {
   const zs = toks.map(t => t.z[picked]), m = Math.max(3, ...zs.map(Math.abs));
   g.fillStyle = "#c9d0d4"; g.fillRect(0, h * 0.6, w, 1);
   const bw = w / zs.length, base = h * 0.6;
-  zs.forEach((z, i) => { const bh = z > 0 ? (z / m) * (base - 2) : (z / m) * (h - base - 2); g.fillStyle = i === cur ? "#ff5a1f" : z >= 1.9 ? "#ff5a1f" : z > 0 ? "#12161a" : "#9aa4aa"; g.fillRect(i * bw + 0.5, base - Math.max(0, bh), Math.max(1, bw - 1.5), Math.max(1, Math.abs(bh))); });
+  zs.forEach((z, i) => { const bh = z > 0 ? (z / m) * (base - 2) : (z / m) * (h - base - 2); g.fillStyle = z >= 1.9 ? "#ff5a1f" : z > 0 ? "#12161a" : "#9aa4aa"; g.fillRect(i * bw + 0.5, base - Math.max(0, bh), Math.max(1, bw - 1.5), Math.max(1, Math.abs(bh))); });
+  if (cur >= 0) { g.fillStyle = "#ff5a1f"; g.fillRect(cur * bw, h - 3 * devicePixelRatio, Math.max(2, bw), 3 * devicePixelRatio); }   // marks the selected word
   const top = toks.map((t, i) => ({ t, z: zs[i] })).sort((a, b) => b.z - a.z).slice(0, 6).filter(x => x.z > 0.5);
   $("nHint").textContent = top.length ? "Words in the text that make it fire most:" : "It hasn't fired well above its usual level on this text yet.";
   $("nToks").innerHTML = top.map(x => `<div><span>${esc(x.t.piece.trim() || show(x.t.piece))}</span><em>+${x.z.toFixed(1)}σ</em></div>`).join("");
@@ -157,7 +158,7 @@ function hiddenToks() {
 function renderText() {
   const h = hiddenToks();
   let lastPrompt = false;
-  $("out").innerHTML = toks.map((t, i) => { if (h.has(i)) return ""; const br = lastPrompt && !t.prompt ? "<br>" : ""; lastPrompt = t.prompt; return br + `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`; }).join("") + (busy ? '<span class="caret"></span>' : "");
+  $("out").innerHTML = toks.map((t, i) => { if (h.has(i)) return ""; const br = lastPrompt && !t.prompt ? "<br>" : ""; lastPrompt = t.prompt; return br + `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`; }).join("") + (busy ? '<span class="caret"></span>' : stoppedAtOnce ? '<br><span class="hint">It ended its answer straight away without writing anything: its top choice was the end-of-answer token.</span>' : "");
 }
 $("out").onclick = e => { const el = e.target.closest(".tok"); if (!el || busy) return; focusTok(+el.dataset.i); };
 function renderNext() {
@@ -176,13 +177,15 @@ const special = p => /^<\|.*\|>$/.test(p.trim()) || !p.trim();
 function addTok(id, trace, prompt, cands) {
   const piece = eng.piece(id), z = map.activity(trace.neurons), path = map.path(z);
   const i = toks.push({ id, piece, prompt, z, path, cands }) - 1;
-  if (!special(piece)) wm.add(piece, trace.resid, i);
+  const role = i > 0 && /<\|im_start\|>/.test(toks[i - 1].piece);   // "user" / "assistant" after <|im_start|>
+  if (!special(piece) && !isTag(piece) && !role) wm.add(piece, trace.resid, i);
   return i;
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
+let stoppedAtOnce = false;
 $("btnGen").onclick = async () => {
-  if (busy) return; busy = true; stopFlag = false;
+  if (busy) return; busy = true; stopFlag = false; stoppedAtOnce = false;
   for (const b of ["btnGen", "btnReplay", "btnLoad"]) $(b).disabled = true; $("btnStop").disabled = false;
   toks = []; cur = -1; wm.clear(); wmDirty = true; if (cloud) cloud.busy = true;
   const slow = () => $("slow").checked;
@@ -195,7 +198,7 @@ $("btnGen").onclick = async () => {
     const temp = +$("temp").value, max = +$("maxTok").value, t0 = performance.now(); let n = 0;
     for (; n < max && !stopFlag; n++) {
       const id = sample(logits, temp), cands = softmaxTop(logits, 5, 1).top;
-      if (eng.stopIds.has(id)) break;
+      if (eng.stopIds.has(id)) { if (n === 0) stoppedAtOnce = true; break; }
       const r = await eng.stepTraced(id); logits = r.logits;
       const k = addTok(id, r.trace, false, cands); renderText(); focusTok(k); if (n % 4 === 0) wmSoon();
       $("kSpeed").textContent = ((n + 1) / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
