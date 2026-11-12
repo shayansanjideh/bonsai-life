@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Trace dump</title><pre id="o">starting</pre>
+<script type="module">
+// Dumps WebGPU tap values for comparison with a reference (llama.cpp's eval-callback, see kaggle_brain_test.py TEST=truth).
+// For the last 3 prompt tokens and every layer: the first 3 and last 3 values of the residual after the layer and of the
+// MLP activations, plus each vector's sum. Result in window.result.
+import { loadRealEngine } from "../web/brain-engine.mjs";
+const o = document.getElementById("o"), q = new URLSearchParams(location.search);
+const prompt = q.get("prompt") || "The capital of France is Paris, and the capital of Japan is";
+const R = {};
+try {
+  const eng = await loadRealEngine({ onStatus: m => o.textContent = m }); const d = eng.traceDims;
+  const ids = eng.encodePrompt(prompt, false), n = ids.length, keep = new Map();
+  await eng.startTraced(ids, (i, t) => { if (i >= n - 3) keep.set(i, t); });
+  const pick = (v, off, len) => { const s = v.subarray(off, off + len); let sum = 0; for (const x of s) sum += x; return { head: [...s.slice(0, 3)], tail: [...s.slice(-3)], sum }; };
+  R.ids = ids; R.dims = d; R.tokens = {};
+  for (const [i, t] of keep) R.tokens[i] = Array.from({ length: d.L }, (_, l) => ({ resid: pick(t.resid, l * d.H, d.H), neurons: pick(t.neurons, l * d.F, d.F) }));
+  R.done = true; o.textContent = "done " + JSON.stringify(ids);
+} catch (e) { R.error = String(e?.stack || e); R.done = true; o.textContent = R.error; }
+window.result = R;
+</script>
