@@ -44,7 +44,7 @@ def llama_reference():
             try: urllib.request.urlretrieve(f"https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf/resolve/main/{name}", mp)
             except Exception as e: log("download failed", name, e); continue
         env = dict(os.environ, LD_LIBRARY_PATH=os.path.dirname(ev) + ":" + os.environ.get("LD_LIBRARY_PATH", ""))
-        r = subprocess.run([ev, "-m", mp, "-p", TRUTH_PROMPT, "-ngl", "0", "-c", "256", "-t", str(os.cpu_count() or 4), "--no-warmup", "--temp", "0"], capture_output=True, text=True, timeout=1800, env=env)
+        r = subprocess.run([ev, "-m", mp, "-p", TRUTH_PROMPT, "-ngl", "0", "-c", "256", "-t", str(os.cpu_count() or 4)], capture_output=True, text=True, timeout=1800, env=env)
         out = r.stdout + r.stderr
         open(os.path.join(W, f"evalcb_{name}.txt"), "w").write(out)
         log(name, "eval-callback exit", r.returncode, "bytes", len(out))
