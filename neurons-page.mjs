@@ -145,6 +145,7 @@ function drawWordMap() {
   const boxes = [], fs = 12.5 * dpr, lab = wmPts.map((p, i) => i).sort((a, b) => (wmPts[b].meta === cur) - (wmPts[a].meta === cur) || (toks[wmPts[a].meta]?.prompt ? 1 : 0) - (toks[wmPts[b].meta]?.prompt ? 1 : 0));
   for (const i of lab) {
     const p = wmPts[i], isCur = p.meta === cur, txt = wordAt(p.meta).slice(0, 16); if (!txt) continue;
+    if (!isCur && !/\p{L}{3}/u.test(txt)) continue; // punctuation and one-letter words only add clutter
     g.font = font(isCur ? 600 : 400, 12.5);
     const bw = g.measureText(txt).width, y = Y(p.y) + 4 * dpr;
     const x = X(p.x) + 7 * dpr + bw > w - 2 * dpr ? X(p.x) - 7 * dpr - bw : X(p.x) + 7 * dpr;   // flip to the left of the dot at the right edge
