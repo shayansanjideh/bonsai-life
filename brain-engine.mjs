@@ -240,33 +240,35 @@ export async function loadRealEngine(opts) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// StubEngine: a fake 24-layer "model" over a small word vocabulary. Bigram logits from a fixed seed; surgery adds
-// noise proportional to the damaged fraction, so every UI path (forking, surgery, scans, the game) can be exercised
-// without WebGPU. Open brain.html?stub=1.
+// StubEngine: a scripted fake model for testing the page without a GPU (open brain.html?stub=1). It follows a few
+// canned answers word by word with plausible alternatives, so screenshots look like real use. Damage adds noise and
+// repetition in proportion to the fraction of weights switched off, and layer 0's MLP is made critical.
 
-const STUB_WORDS = ("<eos> . , the a cat dog sat on mat and then ran to park big small red blue happy sad tree sun moon " +
-  "water boils at 100 degrees Celsius capital of France is Paris Japan Tokyo one two three four five six seven eight " +
-  "I am robot banana purple elephant tell me about your day today was good walked saw friend ate lunch it very " +
-  "nice sky rain cloud bird sang song we you they said hello world once upon time there lived king queen castle").split(" ");
+const SCRIPTS = [
+  { match: /sky/i, text: "The sky looks blue because sunlight scatters off the tiny molecules in the air. Blue light has a shorter wavelength, so it scatters much more than red light, and that scattered blue reaches our eyes from every direction." },
+  { match: /day/i, text: "My day was pretty good! I took a long walk in the park, had a banana for lunch, and spent the evening reading a book about the moon." },
+  { match: /once upon/i, text: "Once upon a time there was a little robot who lived in a quiet town. Every morning it watered the garden and said hello to the birds." },
+  { match: /capital/i, text: "The capital of France is Paris." },
+  { match: /cat sat/i, text: "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight." },
+];
+const POOL = ("the a it and of to is was in that this because light air blue red sun sky so very some more most its from our every with on at they we I you one time little big then there day good about".split(" "));
 
 function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const words = t => t.trim().split(/\s+/).filter(Boolean);
 
 export class StubEngine {
   constructor({ layers = 24, delayMs = 15 } = {}) {
     this.kind = "stub"; this.delayMs = delayMs;
-    this.vocab = STUB_WORDS; this.V = STUB_WORDS.length;
+    this.vocab = ["<eos>"]; this.index = new Map([["<eos>", 0]]);
     this.stopIds = new Set([0]);
+    for (const sc of SCRIPTS) for (const w of words(sc.text)) this.id(w);
+    for (const w of POOL) this.id(w);
     this.layers = Array.from({ length: layers }, (_, i) => ({ i, type: (i + 1) % 4 === 0 ? "full" : "linear" }));
-    const r = mulberry(7);
-    this.table = Array.from({ length: this.V }, () => Float32Array.from({ length: this.V }, () => (r() - 0.5) * 6));
-    // make the reference sentence and a few phrases likely
-    const seq = "the cat sat on the mat . water boils at 100 degrees Celsius . the capital of France is Paris . one two three four five six seven eight".split(" ");
-    for (let i = 0; i + 1 < seq.length; i++) this.table[this.id(seq[i])][this.id(seq[i + 1])] += 8;
-    this.spec = {}; this.ctx = [];
+    this.spec = {}; this.ctx = []; this.script = null; this.promptLen = 0;
     const self = this;
     this.surgeon = {
       layers: this.layers.map(l => ({ ...l, mixer: [{}], mlp: [{}] })),
-      totalWeights: 1.7e9,
+      totalWeights: 1.372e9,
       async init() {},
       async apply(spec) { self.spec = spec ?? {}; return 1; },
       restore() { self.spec = {}; return 1; },
@@ -274,21 +276,40 @@ export class StubEngine {
     };
   }
   get name() { return "Stub model (no GPU)"; }
-  id(w) { const i = this.vocab.indexOf(w); return i < 0 ? 1 : i; }
-  encodePrompt(text) { return text.trim().toLowerCase().split(/\s+/).filter(Boolean).map(w => this.id(w.replace(/[^a-z0-9]/g, "") || w)); }
-  decode(ids) { return ids.map(i => this.piece(i)).join(""); }
+  id(w) { let i = this.index.get(w); if (i === undefined) { i = this.vocab.length; this.vocab.push(w); this.index.set(w, i); } return i; }
+  encodePrompt(text) { return words(text).map(w => this.id(w)); }
+  decode(ids) { return ids.map(i => this.piece(i)).join("").replace(/^ /, ""); }
   piece(id) { return id === 0 ? "" : " " + this.vocab[id]; }
   #logits() {
-    const last = this.ctx[this.ctx.length - 1] ?? 1, row = this.table[last];
-    const dmg = this.surgeon.damagedFraction(this.spec), critical = this.spec.knock?.has("L0.mlp") ? 1 : 0;
-    const r = mulberry(last * 131 + this.ctx.length * 7 + Math.round(dmg * 1000) + (this.spec.seed ?? 0));
-    const out = new Float32Array(this.V);
-    for (let i = 0; i < this.V; i++) out[i] = row[i] * (1 - Math.min(0.95, dmg * 1.6 + critical * 0.8)) + (r() - 0.5) * 10 * (dmg + critical);
-    if (this.ctx.length > 30) out[0] += 6;
+    const V = this.vocab.length, n = this.ctx.length, last = this.ctx[n - 1] ?? 0;
+    const sw = this.script ? words(this.script.text) : null;
+    const pos = this.script ? n - this.promptLen + this.offset : -1;
+    const expected = sw ? (pos < sw.length ? this.id(sw[pos]) : 0) : 0;
+    const knock = this.spec.knock ?? new Set(), p = this.spec.random ?? 0;
+    let dmg = p * (this.spec.mode === "flip" ? 2.2 : 1) + knock.size * 0.004;
+    if (knock.has("L0.mlp")) dmg += 0.45;
+    const r = mulberry(n * 977 + last * 131 + (this.spec.seed ?? 1) * 7);
+    const out = new Float32Array(V).fill(-8);
+    for (let k = 0; k < 6; k++) out[1 + Math.floor(r() * (V - 1))] = 1.5 + r() * 2.2;  // plausible alternatives
+    out[expected] = Math.max(out[expected], 7.5 - 2.5 * r());
+    if (dmg > 0) {
+      const rn = mulberry(n * 31 + last + Math.round(dmg * 1e4));
+      for (let i = 0; i < V; i++) out[i] += (rn() - 0.5) * 18 * dmg;
+      out[expected] -= 9 * dmg;
+      if (n > this.promptLen + 2) out[this.ctx[n - 2]] += 14 * dmg;                        // loops: "a time, a time"
+    }
     return out;
   }
   async #wait() { if (this.delayMs) await new Promise(r => setTimeout(r, this.delayMs)); }
-  async start(ids) { this.ctx = [...ids]; await this.#wait(); return this.#logits(); }
+  async start(ids) {
+    this.ctx = [...ids];
+    const text = this.decode(ids);
+    this.script = SCRIPTS.find(s => s.match.test(text)) ?? (ids.length === 1 ? SCRIPTS.at(-1) : null); // one token = the reference-loss paragraph
+    // a script that starts with the prompt's own words (raw continuation) is followed from inside; otherwise from its start
+    this.offset = 0; this.promptLen = ids.length;
+    if (this.script) { const sw = words(this.script.text), pw = words(text); if (sw.slice(0, pw.length).join(" ") === pw.join(" ")) this.offset = pw.length; }
+    await this.#wait(); return this.#logits();
+  }
   async step(id) { this.ctx.push(id); await this.#wait(); return this.#logits(); }
   get position() { return this.ctx.length; }
 }
