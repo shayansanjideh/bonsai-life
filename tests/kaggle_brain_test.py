@@ -62,7 +62,7 @@ def parse_evalcb(text):
     import re
     res, cur = {}, None
     for line in text.splitlines():
-        m = re.match(r"\s*ggml_debug:\s+(\S+)\s*=.*=\s*\{([\d,\s]+)\}", line)
+        m = re.match(r"\s*(?:ggml_debug|common_debug_cb_eval):\s+(\S+)\s*=.*=\s*\{([\d,\s]+)\}", line)
         if m: cur = m.group(1); res[cur] = {"rows": [], "shape": [int(x) for x in m.group(2).split(",")]}; continue
         if cur is None: continue
         m = re.match(r"\s*sum\s*=\s*([-\d.eE+naif]+)", line)
@@ -190,4 +190,9 @@ def main():
     log("=== summary", json.dumps(summary, indent=1))
     json.dump(summary, open(os.path.join(W, "summary.json"), "w"), indent=1)
 
-main()
+if len(sys.argv) == 4 and sys.argv[1] == "--compare":   # offline: python kaggle_brain_test.py --compare evalcb.txt result_x.json
+    c = compare({"text": open(sys.argv[2]).read(), "model": os.path.basename(sys.argv[2])}, json.load(open(sys.argv[3]))["result"])
+    print(json.dumps({"mlp_name": c["mlp_name"], "web_ids": c["web_ids"], "overall": c["overall"]}, indent=1))
+    for r in c["layers"]: print(f"L{r['layer']:2d} resid {r['resid']}  neurons {r['neurons']}")
+else:
+    main()
