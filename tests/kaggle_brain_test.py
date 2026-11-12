@@ -15,7 +15,11 @@ def sh(cmd, timeout=900):
     if out.strip(): log(out)
     return r.returncode
 
-FILES = ["web/brain-engine.mjs", "web/naturalist.mjs", "web/vendor/bonsai.mjs", "tests/real-model-test.html"]
+FILES = ["web/brain-engine.mjs", "web/naturalist.mjs", "web/neurons.mjs", "web/vendor/bonsai.mjs", "tests/real-model-test.html", "tests/neuron-trace-test.html"]
+# Which test page to run. TEST=neuron runs the activation-tap self-test (minutes); TEST=brain runs the surgery test and,
+# on a real GPU, the 6-passage lesion scan (far too slow for the CPU fallback, so it runs in quick mode there).
+TEST = os.environ.get("BONSAI_TEST", "neuron")
+PAGE = {"neuron": "tests/neuron-trace-test.html", "brain": "tests/real-model-test.html"}[TEST]
 def fetch_repo():
     if sh(f"timeout 90 git clone --depth 1 https://github.com/shayansanjideh/bonsai-life {ROOT}", 120) == 0:
         return
@@ -75,7 +79,7 @@ def main():
             if not info or (name == "t4_vulkan" and "swiftshader" in json.dumps(info).lower()):
                 log("no usable adapter for", name); b.close(); continue
             t0 = time.time()
-            pg.goto("http://127.0.0.1:8777/tests/real-model-test.html" + ("?quick=1" if quick else ""))
+            pg.goto(f"http://127.0.0.1:8777/{PAGE}" + ("?quick=1" if quick and TEST == "brain" else ""))
             res = None
             while time.time() - t0 < budget:
                 time.sleep(10)
@@ -91,7 +95,7 @@ def main():
             json.dump({"adapter": info, "result": res, "text": text, "seconds": time.time() - t0}, open(os.path.join(W, f"result_{name}.json"), "w"), indent=1)
             summary[name] = {"adapter": info, "done": bool(res and res.get("done")), "failed": res.get("failed") if res else None, "seconds": round(time.time() - t0)}
             b.close()
-            if res and res.get("done") and not res.get("failed") and res.get("scan"): break  # full run on the GPU, no need for the fallback
+            if res and res.get("done") and not res.get("failed") and (res.get("scan") or TEST == "neuron"): break  # done on the GPU, no need for the fallback
     srv.kill()
     log("=== summary", json.dumps(summary, indent=1))
     json.dump(summary, open(os.path.join(W, "summary.json"), "w"), indent=1)
