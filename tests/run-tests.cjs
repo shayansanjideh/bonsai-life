@@ -28,20 +28,20 @@ const path = require("path");
     await ui.click('.cell[data-k="L0.mlp"]'); await ui.waitForTimeout(400);
     await ui.waitForFunction(() => !document.getElementById("btnGen").disabled && !document.getElementById("compareWrap").hidden, null, { timeout: 20000 });
     const off = await ui.textContent("#kOff"), loss = await ui.textContent("#kLoss");
-    await ui.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + "/write.png" : "/dev/null" });
+    if (process.env.SHOT_DIR) await ui.screenshot({ path: process.env.SHOT_DIR + "/write.png" });
     await ui.click('[data-tab="scan"]').catch(() => {});
     await ui.evaluate(() => { for (const b of document.querySelectorAll(".tabs button")) b.classList.toggle("on", b.dataset.tab === "scan"); for (const p of document.querySelectorAll(".tabpane")) p.classList.toggle("on", p.id === "tab-scan"); });
     await ui.click("#btnScan"); await ui.waitForFunction(() => /done/.test(document.getElementById("scanStat").textContent), null, { timeout: 60000 });
     const bars = await ui.locator("#scanChart rect").count();
     await ui.click("#btnSweep"); await ui.waitForFunction(() => /sweep done/.test(document.getElementById("scanStat").textContent), null, { timeout: 60000 });
     const sweepRows = await ui.locator("#sweepOut tr").count();
-    await ui.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + "/scan.png" : "/dev/null" });
+    if (process.env.SHOT_DIR) await ui.screenshot({ path: process.env.SHOT_DIR + "/scan.png" });
     await ui.evaluate(() => { for (const b of document.querySelectorAll(".tabs button")) b.classList.toggle("on", b.dataset.tab === "game"); for (const p of document.querySelectorAll(".tabpane")) p.classList.toggle("on", p.id === "tab-game"); });
     await ui.fill("#gCustom", "cat"); await ui.dispatchEvent("#gCustom", "change");
     await ui.click("#btnGame");
     for (let i = 0; i < 40; i++) { await ui.waitForSelector("#live .cand", { timeout: 10000 }).catch(() => {}); if (await ui.locator(".win").count()) break; const c = ui.locator("#live .cand"); if (!(await c.count())) break; await c.first().click(); await ui.waitForTimeout(60); }
     const gameMsg = await ui.textContent("#gMsg"), picks = await ui.textContent("#gPicks");
-    await ui.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + "/game.png" : "/dev/null" });
+    if (process.env.SHOT_DIR) await ui.screenshot({ path: process.env.SHOT_DIR + "/game.png" });
     console.log(`UI: ${n1} tokens, fork ok, ${off} off, loss ${loss}, ${bars} scan bars, ${sweepRows - 1} sweep rows, game: "${gameMsg}" picks ${picks}`);
     if (uerr.length) { console.log("UI errors:", uerr); failed = true; }
     if (bars !== 48 || sweepRows !== 9) failed = true;

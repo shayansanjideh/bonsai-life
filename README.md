@@ -27,6 +27,7 @@ A second page that opens up the model itself, which only works because Bonsai ru
 - **Brain surgery.** Switch off the token mixer (attention or linear attention) or the MLP of any layer, or a random fraction of all weights, by zeroing (or sign-flipping) the f16 scale shared by each group of 128 ternary weights. The edits are made in GPU memory and are restored bit-exactly. A reference loss (nats per token on a fixed paragraph of easy facts) tracks how much dumber it got.
 - **Lesion scan and damage sweep.** Knock out each block in turn and chart the loss increase per layer, or raise random damage step by step and watch the text fall apart.
 - **Make it say it.** Steer it to a target phrase while only choosing from its top 5 tokens.
+- **3D brain.** The 24 layers as a rack of chrome blocks (token mixers on top, MLPs below). Orbit it, click a block to switch it off, watch each generated token pulse through it, and after a lesion scan see each block glow and grow by how much the loss rose without it. It uses three.js from jsDelivr (`web/brain3d.mjs`). It stops drawing when idle so it doesn't compete with the model for the GPU. On software GL it only redraws when something changes.
 
 Open `brain.html?stub=1` to try the UI with a tiny fake model and no GPU. `node tests/run-tests.cjs` runs the weight-surgery checks on a software WebGPU device (bit-exact restore, only the intended scales change) plus a UI smoke test in stub mode.
 
