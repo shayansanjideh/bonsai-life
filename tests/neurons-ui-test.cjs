@@ -11,7 +11,7 @@ const { chromium } = require("playwright"); const { spawn } = require("child_pro
     p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && (process.env.THREE_DIR || !/three|unpkg/.test(m.text()))) errs.push(m.text()); });
     if (process.env.THREE_DIR) await p.route("https://unpkg.com/three@0.160.0/**", r => r.fulfill({ path: path.join(process.env.THREE_DIR, r.request().url().split("three@0.160.0/")[1]), contentType: "application/javascript" }));
     await p.goto("http://127.0.0.1:8783/web/neurons.html?stub=1");
-    await p.click("#btnLoad"); await p.waitForFunction(() => !document.getElementById("btnGen").disabled, null, { timeout: 90000 });
+    await p.click("#btnLoad"); await p.waitForFunction(() => !document.getElementById("btnGen").disabled, null, { timeout: 90000 }).catch(e => { throw new Error(e.message + " errors: " + errs.join(" / ") + " status: "); });
     await p.click("#btnGen"); await p.waitForFunction(() => !document.getElementById("btnGen").disabled, null, { timeout: 180000 });
     const st = await p.evaluate(() => ({ toks: cloudState.toks.length, S: cloudState.map.S, edges: cloudState.map.edges.length, live: cloudState.map.live, wm: document.getElementById("wm").width }));
     await p.click('.tok[data-i="20"]'); await p.waitForTimeout(800);

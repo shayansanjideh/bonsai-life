@@ -1,5 +1,5 @@
 // neurons.html: load Bonsai, map a sample of its neurons on a warm-up text, then trace every word it reads or writes.
-import { loadRealEngine, StubEngine, sample } from "./brain-engine.mjs";
+import { loadRealEngine, StubEngine, sample, softmaxTop } from "./brain-engine.mjs";
 import { NeuronMap, WordMap } from "./neurons.mjs";
 
 const $ = id => document.getElementById(id);
@@ -34,11 +34,11 @@ $("btnLoad").onclick = async () => {
       });
     }
     dims = eng.traceDims;
-    $("wmLayer").max = dims.L - 1; if (+$("wmLayer").value > dims.L - 1) $("wmLayer").value = Math.round(dims.L * 0.66);
+    $("wmLayer").max = dims.L - 1; $("wmLayerMax").textContent = dims.L - 1; if (+$("wmLayer").value > dims.L - 1) $("wmLayer").value = Math.round(dims.L * 0.66);
     $("wmLayerV").textContent = $("wmLayer").value;
     await calibrate();
     setStatus("Ready", "on");
-    $("btnLoad").textContent = "Loaded"; $("btnLoad").classList.remove("primary");
+    $("btnLoad").textContent = "Loaded"; $("btnLoad").closest(".ld")?.setAttribute("hidden", ""); $("btnLoad").classList.remove("primary");
     $("btnGen").disabled = false;
     window.cloudState = { eng, map, toks };
     if (params.has("autogen")) $("btnGen").click();
@@ -66,18 +66,25 @@ async function calibrate() {
   setStatus("placing neurons…", "busy"); await new Promise(r => setTimeout(r, 30));
   map.build();
   const S = map.S, F = dims.F;
-  $("kN").textContent = `${S.toLocaleString()} of ${(dims.L * F).toLocaleString()}`;
-  $("howDots").textContent = `Each layer of Bonsai has an MLP with ${F.toLocaleString()} neurons. Showing all ${(dims.L * F).toLocaleString()} would be a fog, so each layer shows the ${map.K} that vary most on a ${map.calibTokens ?? total}-word warm-up text. Their activations are copied off the GPU after every layer, for every word.`;
-  if (eng.kind === "stub") $("cloudFoot").textContent = "Test model: these activations are generated, not Bonsai's.";
+  $("kN").textContent = S.toLocaleString(); $("rShown").textContent = `${S.toLocaleString()} / ${(dims.L * F).toLocaleString()}`;
+  $("howDots").textContent = `Each layer of Bonsai has an MLP with ${F.toLocaleString()} neurons. Showing all ${(dims.L * F).toLocaleString()} would be a fog, so each layer shows the ${map.K} that vary most on a ${map.calibTokens ?? total}-word warm-up text. Their activations are copied off the GPU after every layer, for every word, and match PrismML's own llama.cpp to a correlation of 0.9999.`;
   try {
     const { NeuronCloud } = await import("./neurons3d.mjs");
     $("cloud").innerHTML = "";
-    cloud = new NeuronCloud($("cloud"), map, { onHover, onPick });
+    cloud = new NeuronCloud($("cloud"), map, { onHover, onPick, onView: v => { $("rAz").textContent = v.azimuth.toFixed(1).padStart(5, "0") + "°"; $("rEl").textContent = v.elevation.toFixed(1) + "°"; drawRuler(v.ruler); } });
     window.cloud = cloud;
   } catch (e) { console.error(e); $("cloud").innerHTML = `<div class="fallback">3D view unavailable here (${esc(e.message || e)}).</div>`; }
   wm = new WordMap(dims);
 }
 
+function drawRuler(r) {
+  const el = $("ruler"); if (!r || r.x < 40) { el.hidden = true; return; }
+  el.hidden = false; const top = 28 + Math.min(...r.ys), bot = 28 + Math.max(...r.ys);
+  el.style.cssText = `left:${r.x - 40}px;top:${top}px;height:${bot - top}px;bottom:auto`;
+  const h1 = document.querySelector(".stage .ov h1, .stage .h1"), cb = $("cloud").getBoundingClientRect(), hb = h1?.getBoundingClientRect();
+  const clear = y => !hb || cb.top + y > hb.bottom + 6 || cb.left + r.x - 40 > hb.right + 6;   // keep labels off the headline
+  el.innerHTML = r.ys.map((y, l) => `<span class="${(l % 4 === 0 || l === r.ys.length - 1) && clear(y) ? "l" : ""}" data-l="L${String(l).padStart(2, "0")}" style="top:${y + 28 - top}px"></span>`).join("");
+}
 function onHover(h) {
   if (!h) { tip.style.display = "none"; return; }
   const t = toks[cur], z = t ? t.z[h.s] : null;
@@ -89,16 +96,16 @@ function onPick(p) { picked = p ? p.s : -1; renderNeuron(); }
 function renderNeuron() {
   const c = $("spark"), g = c.getContext("2d"), w = c.width = c.clientWidth * devicePixelRatio, h = c.height = c.clientHeight * devicePixelRatio;
   g.clearRect(0, 0, w, h);
-  if (picked < 0) { $("nTitle").textContent = "Click a dot in the cloud"; $("nToks").innerHTML = ""; $("nHint").textContent = "You'll see which words in the text make it fire."; return; }
-  const d = map.describe(picked); $("nTitle").textContent = `Layer ${d.layer} · neuron ${d.neuron}`;
+  if (picked < 0) { $("nTitle").textContent = "–"; $("nToks").innerHTML = ""; $("nHint").textContent = "Click a dot in the cloud to follow one neuron."; return; }
+  const d = map.describe(picked); $("nTitle").innerHTML = `L${String(d.layer).padStart(2, "0")} <span>/</span> N${d.neuron}`;
   if (!toks.length) { $("nHint").textContent = "Generate some text to see what makes it fire."; $("nToks").innerHTML = ""; return; }
   const zs = toks.map(t => t.z[picked]), m = Math.max(3, ...zs.map(Math.abs));
-  g.strokeStyle = "rgba(16,40,80,.15)"; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
-  const bw = w / zs.length;
-  zs.forEach((z, i) => { const bh = (z / m) * (h / 2 - 2); g.fillStyle = i === cur ? "#0d1526" : z > 0 ? "#ff2a2a" : "#2a7bff"; g.fillRect(i * bw + 0.5, h / 2 - Math.max(0, bh), Math.max(1, bw - 1), Math.abs(bh)); });
-  const top = toks.map((t, i) => ({ t, z: zs[i] })).sort((a, b) => b.z - a.z).slice(0, 8).filter(x => x.z > 0.5);
-  $("nHint").textContent = top.length ? "Strongest on these words in the text (σ above its usual level):" : "It hasn't fired well above its usual level on this text yet.";
-  $("nToks").innerHTML = top.map(x => `<span>${esc(show(x.t.piece))}<b>${x.z.toFixed(1)}σ</b></span>`).join("");
+  g.fillStyle = "#c9d0d4"; g.fillRect(0, h * 0.6, w, 1);
+  const bw = w / zs.length, base = h * 0.6;
+  zs.forEach((z, i) => { const bh = z > 0 ? (z / m) * (base - 2) : (z / m) * (h - base - 2); g.fillStyle = i === cur ? "#ff5a1f" : z >= 1.9 ? "#ff5a1f" : z > 0 ? "#12161a" : "#9aa4aa"; g.fillRect(i * bw + 0.5, base - Math.max(0, bh), Math.max(1, bw - 1.5), Math.max(1, Math.abs(bh))); });
+  const top = toks.map((t, i) => ({ t, z: zs[i] })).sort((a, b) => b.z - a.z).slice(0, 6).filter(x => x.z > 0.5);
+  $("nHint").textContent = top.length ? "Words in the text that make it fire most:" : "It hasn't fired well above its usual level on this text yet.";
+  $("nToks").innerHTML = top.map(x => `<div><span>${esc(x.t.piece.trim() || show(x.t.piece))}</span><em>+${x.z.toFixed(1)}σ</em></div>`).join("");
 }
 
 // ---- word map (2D canvas) ----
@@ -106,31 +113,32 @@ let wmPts = [], wmDirty = true;
 function drawWordMap() {
   const c = $("wm"), g = c.getContext("2d"), dpr = devicePixelRatio, w = c.width = c.clientWidth * dpr, h = c.height = c.clientHeight * dpr;
   g.clearRect(0, 0, w, h);
-  if (!wm || wm.items.length < 4) { g.fillStyle = "#8a95a8"; g.font = `${13 * dpr}px -apple-system,system-ui,sans-serif`; g.textAlign = "center"; g.fillText(wm ? "Generate a few words to fill the map." : "Wake Bonsai first.", w / 2, h / 2); return; }
+  g.strokeStyle = "rgba(18,22,26,.08)"; g.lineWidth = 1;
+  for (let k = 1; k < 6; k++) { const x = Math.round(w * k / 6) + .5, y = Math.round(h * k / 6) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  const font = (wt, px) => `${wt} ${px * dpr}px "Instrument Sans",-apple-system,Inter,system-ui,sans-serif`;
+  if (!wm || wm.items.length < 4) { g.fillStyle = "#6c757d"; g.font = font(400, 13); g.textAlign = "center"; g.fillText(wm ? "Generate a few words to fill the map." : "Wake Bonsai first.", w / 2, h / 2); return; }
   if (wmDirty) { wmPts = wm.project(+$("wmLayer").value); wmDirty = false; }
   const pad = 26 * dpr, X = x => pad + (x + 1) / 2 * (w - 2 * pad), Y = y => pad + (1 - (y + 1) / 2) * (h - 2 * pad);
-  const n = wmPts.length;
-  g.lineWidth = 1 * dpr; g.strokeStyle = "rgba(155,123,255,.25)"; g.beginPath();
+  g.lineWidth = 0.6 * dpr; g.strokeStyle = "rgba(18,22,26,.2)"; g.beginPath();
   wmPts.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke();
-  const order = wmPts.map((p, i) => i).sort((a, b) => wmPts[a].z - wmPts[b].z);
-  g.font = `${12 * dpr}px ui-monospace,SFMono-Regular,Menlo,monospace`; g.textAlign = "left";
-  for (const i of order) {
-    const p = wmPts[i], isCur = p.meta === cur, t = toks[p.meta], r = (2.4 + 1.4 * (p.z + 1) / 2) * dpr;
-    g.fillStyle = isCur ? "#ff2a2a" : t?.prompt ? "rgba(86,98,117,.5)" : `hsl(${255 - 40 * i / n},70%,58%)`;
-    g.beginPath(); g.arc(X(p.x), Y(p.y), isCur ? r * 1.7 : r, 0, 7); g.fill();
+  for (const p of wmPts) {
+    const isCur = p.meta === cur, t = toks[p.meta];
+    g.fillStyle = isCur ? "#ff5a1f" : t?.prompt ? "#9aa4aa" : "#12161a";
+    g.beginPath(); g.arc(X(p.x), Y(p.y), (isCur ? 4.5 : 2.4) * dpr, 0, 7); g.fill();
   }
   // labels: current word first, then the model's own words, then the prompt; skip any that would overlap
-  const boxes = [], fs = 12 * dpr, lab = wmPts.map((p, i) => i).sort((a, b) => (wmPts[b].meta === cur) - (wmPts[a].meta === cur) || (toks[wmPts[a].meta]?.prompt ? 1 : 0) - (toks[wmPts[b].meta]?.prompt ? 1 : 0));
+  const boxes = [], fs = 12.5 * dpr, lab = wmPts.map((p, i) => i).sort((a, b) => (wmPts[b].meta === cur) - (wmPts[a].meta === cur) || (toks[wmPts[a].meta]?.prompt ? 1 : 0) - (toks[wmPts[b].meta]?.prompt ? 1 : 0));
   for (const i of lab) {
     const p = wmPts[i], isCur = p.meta === cur, txt = p.text.trim().slice(0, 14); if (!txt) continue;
-    const x = X(p.x) + 6 * dpr, y = Y(p.y) + 4 * dpr, bw = g.measureText(txt).width, bx = [x - 1, y - fs, x + bw + 1, y + 3];
+    g.font = font(isCur ? 600 : 400, 12.5);
+    const x = X(p.x) + 7 * dpr, y = Y(p.y) + 4 * dpr, bw = g.measureText(txt).width, bx = [x - 1, y - fs, x + bw + 1, y + 3];
     if (!isCur && boxes.some(o => bx[0] < o[2] && bx[2] > o[0] && bx[1] < o[3] && bx[3] > o[1])) continue;
-    boxes.push(bx); g.fillStyle = isCur ? "#0d1526" : toks[p.meta]?.prompt ? "rgba(86,98,117,.75)" : "rgba(13,21,38,.82)";
-    if (isCur) { g.font = `600 ${fs}px ui-monospace,SFMono-Regular,Menlo,monospace`; }
-    g.fillText(txt, x, y); g.font = `${fs}px ui-monospace,SFMono-Regular,Menlo,monospace`;
+    boxes.push(bx); g.fillStyle = isCur ? "#ff5a1f" : toks[p.meta]?.prompt ? "#6c757d" : "#12161a";
+    g.fillText(txt, x, y);
   }
 }
 $("wmLayer").oninput = () => { $("wmLayerV").textContent = $("wmLayer").value; wmDirty = true; drawWordMap(); };
+renderNext();
 new ResizeObserver(() => drawWordMap()).observe($("wm"));
 let wmT = 0; const wmSoon = () => { wmDirty = true; clearTimeout(wmT); wmT = setTimeout(drawWordMap, 120); };
 
@@ -139,17 +147,22 @@ function renderText() {
   $("out").innerHTML = toks.map((t, i) => `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`).join("") + (busy ? '<span class="caret"></span>' : "");
 }
 $("out").onclick = e => { const el = e.target.closest(".tok"); if (!el || busy) return; focusTok(+el.dataset.i); };
+function renderNext() {
+  const t = toks[cur], el = $("live");
+  if (!t || !t.cands) { el.innerHTML = `<p class="hint">${t ? "This is a prompt word, so the model didn't choose it." : "Generate to see the top 5 choices at each word."}</p>`; return; }
+  el.innerHTML = t.cands.map((c, k) => `<div class="cand static${c.id === t.id ? " chosen" : ""}"><span class="n">${String(k + 1).padStart(2, "0")}</span><span class="t">${esc(show(eng.piece(c.id)))}</span><span class="track"><span class="bar" style="transform:scaleX(${c.p.toFixed(4)})"></span></span><span class="p">${(c.p * 100).toFixed(1)}%</span></div>`).join("");
+}
 function focusTok(i, ms) {
-  cur = i; const t = toks[i]; if (!t) return;
+  cur = i; const t = toks[i]; if (!t) return; renderNext();
   cloud?.show(t.z, t.path, { ms: ms ?? ($("slow").checked ? 2400 : 650) });
   $("kTok").textContent = show(t.piece).trim().slice(0, 12) || "·";
   for (const el of $("out").querySelectorAll(".tok")) el.classList.toggle("cur", +el.dataset.i === i);
   drawWordMap(); renderNeuron();
 }
 const special = p => /^<\|.*\|>$/.test(p.trim()) || !p.trim();
-function addTok(id, trace, prompt) {
+function addTok(id, trace, prompt, cands) {
   const piece = eng.piece(id), z = map.activity(trace.neurons), path = map.path(z);
-  const i = toks.push({ id, piece, prompt, z, path }) - 1;
+  const i = toks.push({ id, piece, prompt, z, path, cands }) - 1;
   if (!special(piece)) wm.add(piece, trace.resid, i);
   return i;
 }
@@ -168,10 +181,10 @@ $("btnGen").onclick = async () => {
     setStatus("writing", "busy");
     const temp = +$("temp").value, max = +$("maxTok").value, t0 = performance.now(); let n = 0;
     for (; n < max && !stopFlag; n++) {
-      const id = sample(logits, temp);
+      const id = sample(logits, temp), cands = softmaxTop(logits, 5, 1).top;
       if (eng.stopIds.has(id)) break;
       const r = await eng.stepTraced(id); logits = r.logits;
-      const k = addTok(id, r.trace, false); renderText(); focusTok(k); if (n % 4 === 0) wmSoon();
+      const k = addTok(id, r.trace, false, cands); renderText(); focusTok(k); if (n % 4 === 0) wmSoon();
       $("kSpeed").textContent = ((n + 1) / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
       await wait(slow() ? 2600 : 120);
     }

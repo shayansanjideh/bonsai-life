@@ -1,32 +1,35 @@
 // 3D neuron cloud for neurons.html. Each dot is one sampled MLP neuron (layout from neurons.mjs NeuronMap): height is
 // the layer, neurons that fire together sit together. For every token the dots light up layer by layer, bottom to top
-// (warm = firing above its usual level, cool = below), co-firing links between neighbouring layers glow when both ends
+// (orange = far above its usual level, ink = above, teal = below), co-firing links between neighbouring layers glow when both ends
 // are active, and a red line traces where the activity is centred in each layer.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const IDLE = new THREE.Color("#8d9bb8"), HOT = new THREE.Color("#ff2a2a"), WARM = new THREE.Color("#ff8a1f"), COOL = new THREE.Color("#2a7bff");
+const IDLE = new THREE.Color("#9aa4aa"), HOT = new THREE.Color("#ff5a1f"), WARM = new THREE.Color("#12161a"), COOL = new THREE.Color("#0c8f8a");
 
+const LINK_IDLE = new THREE.Color("#e3e8e7").toArray(), LINK_HOT = new THREE.Color("#ff5a1f").toArray();
 const VERT = `
 attribute float aAct; attribute float aSel; uniform float uScale; varying float vAct; varying float vSel;
 void main(){ vAct=aAct; vSel=aSel; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*mv;
-  float a=abs(aAct); gl_PointSize=uScale*(0.6+1.5*a*a+1.4*aSel)/-mv.z; }`;
+  float a=abs(aAct); gl_PointSize=uScale*(0.5+(aAct>0.62?1.5:0.8*a*a)+1.4*aSel)/-mv.z; }`;
 const FRAG = `
 uniform vec3 cIdle; uniform vec3 cHot; uniform vec3 cWarm; uniform vec3 cCool; varying float vAct; varying float vSel;
 void main(){ vec2 p=gl_PointCoord*2.0-1.0; float r=dot(p,p); if(r>1.0) discard;
-  float a=clamp(vAct,-1.0,1.0); vec3 c=a>0.0?mix(cIdle,mix(cWarm,cHot,smoothstep(0.4,1.0,a)),smoothstep(0.0,0.45,a)):mix(cIdle,cCool,smoothstep(0.35,0.9,-a));
-  c=mix(c,vec3(0.05,0.08,0.15),vSel); float edge=smoothstep(1.0,0.55,r); float core=smoothstep(0.35,0.0,r)*abs(a)*0.35;
-  float alpha=edge*(0.38+0.62*smoothstep(0.15,0.7,abs(a)))+vSel; gl_FragColor=vec4(c+core,min(alpha,1.0)); }`;
+  float a=clamp(vAct,-1.0,1.0); vec3 c=a>0.0?(a>0.62?cHot:mix(cIdle,cWarm,smoothstep(0.2,0.45,a))):mix(cIdle,cCool,smoothstep(0.35,0.7,-a));
+  c=mix(c,vec3(0.07,0.086,0.1),vSel); float edge=smoothstep(1.0,0.8,r); float core=0.0;
+  float alpha=edge*(0.55+0.45*smoothstep(0.15,0.5,abs(a)))+vSel; gl_FragColor=vec4(c+core,min(alpha,1.0));
+  #include <colorspace_fragment>
+}`;
 
 export class NeuronCloud {
-  constructor(host, map, { onHover, onPick } = {}) {
-    this.host = host; this.map = map; this.onHover = onHover; this.onPick = onPick;
+  constructor(host, map, { onHover, onPick, onView } = {}) {
+    this.host = host; this.map = map; this.onHover = onHover; this.onPick = onPick; this.onView = onView;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     r.setPixelRatio(Math.min(2, devicePixelRatio)); r.setClearColor(0x000000, 0); host.appendChild(r.domElement);
     const scene = this.scene = new THREE.Scene();
     const Hgt = this.Hgt = (map.L - 1) * map.spacing;
     const cam = this.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-    cam.position.set(15.5, Hgt * 0.72, 18);
+    cam.position.set(13.5, Hgt / 2 + 5.2, 15.5);
     const ctl = this.controls = new OrbitControls(cam, r.domElement);
     ctl.target.set(0, Hgt / 2, 0); ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.45;
     ctl.minDistance = 4; ctl.maxDistance = 40;
@@ -34,12 +37,10 @@ export class NeuronCloud {
     ctl.addEventListener("end", () => { this.idleT = setTimeout(() => ctl.autoRotate = true, 8000); });
 
     // faint layer rings and a floor ring, so the eye can read height as depth through the network
-    const ringMat = new THREE.LineBasicMaterial({ color: 0x9fb2cf, transparent: true, opacity: 0.22 });
+    const ringMat = new THREE.LineBasicMaterial({ color: 0x12161a, transparent: true, opacity: 0.13 });
     const circle = n => { const g = new THREE.BufferGeometry(), p = []; for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; p.push(Math.cos(a), 0, Math.sin(a)); } g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); return g; };
     const cg = circle(96);
     for (let l = 0; l < map.L; l += 1) { const m = new THREE.Line(cg, ringMat); m.scale.setScalar(map.radius * 1.04); m.position.y = l * map.spacing; scene.add(m); }
-    const floor = new THREE.Mesh(new THREE.RingGeometry(map.radius * 1.12, map.radius * 1.16, 128), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -0.35; scene.add(floor);
 
     // neurons
     const S = map.S, g = new THREE.BufferGeometry();
@@ -60,9 +61,9 @@ export class NeuronCloud {
     scene.add(this.links); this.paintLinks();
 
     // the token's path: where activity is centred in each layer
-    this.pathMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85, depthTest: false });
+    this.pathMat = new THREE.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0.95, depthTest: false });
     this.path = new THREE.Mesh(new THREE.BufferGeometry(), this.pathMat); this.path.renderOrder = 10; scene.add(this.path); this.pathN = -1;
-    this.head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), new THREE.MeshBasicMaterial({ color: 0xff2a2a, depthTest: false })); this.head.renderOrder = 11; this.head.visible = false; scene.add(this.head);
+    this.head = new THREE.Mesh(new THREE.SphereGeometry(0.08, 20, 14), new THREE.MeshBasicMaterial({ color: 0xff5a1f, depthTest: false })); this.head.renderOrder = 11; this.head.visible = false; scene.add(this.head);
 
     // hover and click on neurons
     this.ray = new THREE.Raycaster(); this.ray.params.Points.threshold = 0.07; this.mouse = new THREE.Vector2(); this.hover = -1; this.picked = -1;
@@ -85,10 +86,10 @@ export class NeuronCloud {
     this.pathTarget = path; this.t0 = performance.now(); this.waveMs = ms;
   }
   paintLinks() {
-    const { edges } = this.map, c = this.ecol, idle = [0.72, 0.78, 0.88];
+    const { edges } = this.map, c = this.ecol, idle = LINK_IDLE, hot = LINK_HOT;
     edges.forEach(([a, b], i) => {
-      const k = Math.max(0, Math.min(this.act[a], this.act[b]));
-      for (const o of [0, 3]) { c[i * 6 + o] = idle[0] + (1 - idle[0]) * k; c[i * 6 + o + 1] = idle[1] * (1 - k) + 0.16 * k; c[i * 6 + o + 2] = idle[2] * (1 - k) + 0.16 * k; }
+      const k = Math.min(1, Math.max(0, Math.min(this.act[a], this.act[b]) - 0.3) / 0.35);
+      for (const o of [0, 3]) for (let ch = 0; ch < 3; ch++) c[i * 6 + o + ch] = idle[ch] + (hot[ch] - idle[ch]) * k;
     });
     this.links.geometry.attributes.color.needsUpdate = true;
   }
@@ -106,11 +107,20 @@ export class NeuronCloud {
       if (n !== this.pathN || this.pathSrc !== this.pathTarget) {
         this.pathN = n; this.pathSrc = this.pathTarget; this.path.geometry.dispose();
         const pts = []; for (let l = 0; l < n; l++) pts.push(new THREE.Vector3().fromArray(this.pathTarget, l * 3));
-        this.path.geometry = n > 1 ? new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 6, 0.035, 8, false) : new THREE.BufferGeometry();
+        this.path.geometry = n > 1 ? new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 6, 0.022, 8, false) : new THREE.BufferGeometry();
         this.head.visible = true; this.head.position.copy(pts[n - 1]);
       }
     }
     this.controls.update(); this.renderer.render(this.scene, this.camera);
+    if (this.onView && this.n % 10 === 0) { const sp = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target)); this.onView({ azimuth: (THREE.MathUtils.radToDeg(sp.theta) + 360) % 360, elevation: 90 - THREE.MathUtils.radToDeg(sp.phi), ruler: this.ruler() }); }
+  }
+  // screen positions for a layer ruler drawn beside the cloud: y of each layer's centre, x just left of the rings
+  ruler() {
+    const w = this.host.clientWidth, h = this.host.clientHeight, m = this.map, right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const px = v => { const p = v.clone().project(this.camera); return [(p.x + 1) / 2 * w, (1 - p.y) / 2 * h]; };
+    const ys = Array.from({ length: m.L }, (_, l) => px(new THREE.Vector3(0, l * m.spacing, 0))[1]);
+    const mid = new THREE.Vector3(0, (m.L - 1) * m.spacing / 2, 0), [cx] = px(mid), [ex] = px(mid.clone().addScaledVector(right, m.radius * 1.1));
+    return { ys, x: cx - Math.abs(ex - cx) - 24 };
   }
   resize() {
     const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return;
