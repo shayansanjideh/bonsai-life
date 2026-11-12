@@ -1,5 +1,5 @@
 // neurons.html: load Bonsai, map a sample of its neurons on a warm-up text, then trace every word it reads or writes.
-import { loadRealEngine, StubEngine, sample, softmaxTop } from "./brain-engine.mjs";
+import { loadRealEngine, StubEngine, sample, softmaxTop, logProb } from "./brain-engine.mjs";
 import { NeuronMap, WordMap } from "./neurons.mjs";
 
 const $ = id => document.getElementById(id);
@@ -39,7 +39,7 @@ $("btnLoad").onclick = async () => {
     await calibrate();
     setStatus("Ready", "on");
     $("btnLoad").textContent = "Loaded"; $("btnLoad").closest(".ld")?.setAttribute("hidden", ""); $("btnLoad").classList.remove("primary");
-    $("btnGen").disabled = false;
+    $("btnGen").disabled = false; buildBrain();
     window.cloudState = { eng, map, toks };
     if (params.has("autogen")) $("btnGen").click();
   } catch (e) {
@@ -188,7 +188,7 @@ $("btnGen").onclick = async () => {
       $("kSpeed").textContent = ((n + 1) / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
       await wait(slow() ? 2600 : 120);
     }
-    setStatus("Ready", "on");
+    setStatus(knock.size ? `${pct(eng.surgeon.damagedFraction({ knock }))} off` : "Ready", knock.size ? "busy" : "on");
   } catch (e) { console.error(e); setStatus("error: " + (e.message || e).slice(0, 60), "err"); }
   busy = false; if (cloud) cloud.busy = false; renderText(); wmSoon(); renderNeuron();
   for (const b of ["btnGen", "btnReplay"]) $(b).disabled = false; $("btnStop").disabled = true;
@@ -201,6 +201,45 @@ $("btnReplay").onclick = async () => {
   busy = false; $("btnStop").disabled = true; $("btnReplay").disabled = $("btnGen").disabled = false; renderText();
 };
 $("temp").oninput = () => $("tempV").textContent = $("temp").value;
+
+// ---------- surgery: switch blocks off in GPU memory, then rewrite so the cloud shows the damage ----------
+const REF_TEXT = "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight.";
+const knock = new Set(); let intactLoss = null, surgQ = Promise.resolve();
+const pct = f => (f * 100 < 10 ? (f * 100).toFixed(1) : Math.round(f * 100)) + "%";
+async function refLoss() {
+  const ids = eng.encodePrompt(REF_TEXT, false);
+  let logits = await eng.start(ids.slice(0, 1)), nll = 0;
+  for (let i = 1; i < ids.length; i++) { nll -= logProb(logits, ids[i]); if (i < ids.length - 1) logits = await eng.step(ids[i]); }
+  return nll / (ids.length - 1);
+}
+function buildBrain() {
+  const g = $("brain"), ls = eng.layers;
+  g.style.gridTemplateColumns = `auto repeat(${ls.length}, minmax(14px, 1fr))`;
+  g.innerHTML = ['<span></span>', ...ls.map(l => `<span class="lh">${l.i}</span>`),
+    '<span class="rl">Mixer</span>', ...ls.map(l => `<button class="cell${l.type === "full" ? " full" : ""}" data-k="L${l.i}.mixer" title="layer ${l.i} ${l.type === "full" ? "full attention" : "linear attention"}">${l.type === "full" ? "A" : ""}</button>`),
+    '<span class="rl">MLP</span>', ...ls.map(l => `<button class="cell mlp" data-k="L${l.i}.mlp" title="layer ${l.i} MLP"></button>`)].join("");
+}
+function paintBrain() {
+  for (const c of $("brain").querySelectorAll(".cell")) c.classList.toggle("off", knock.has(c.dataset.k));
+  $("mOff").textContent = pct(eng.surgeon.damagedFraction({ knock })); $("btnRestore").disabled = !knock.size;
+  cloud?.setKnocked(new Set([...knock].map(k => +k.slice(1, k.indexOf(".")))));
+}
+function surgery() {                              // queue edits so rapid clicks apply in order
+  paintBrain(); stopFlag = true;
+  surgQ = surgQ.then(async () => {
+    while (busy) await wait(50);
+    busy = true; for (const b of ["btnGen", "btnReplay"]) $(b).disabled = true;
+    try {
+      if (intactLoss === null) { setStatus("measuring the intact model", "busy"); intactLoss = await refLoss(); $("mLoss0").textContent = intactLoss.toFixed(3); }
+      setStatus("editing weights", "busy"); await eng.surgeon.apply({ knock });
+      setStatus("measuring loss", "busy"); const L = await refLoss();
+      $("mLoss").textContent = L.toFixed(3) + (knock.size ? ` (${L >= intactLoss ? "+" : ""}${(L - intactLoss).toFixed(2)})` : "");
+    } catch (e) { console.error(e); setStatus("edit failed: " + (e.message || e).slice(0, 50), "err"); busy = false; return; }
+    busy = false; $("btnGen").disabled = false; $("btnGen").click();
+  });
+}
+$("brain").onclick = e => { const c = e.target.closest(".cell"); if (!c || !eng) return; knock.has(c.dataset.k) ? knock.delete(c.dataset.k) : knock.add(c.dataset.k); surgery(); };
+$("btnRestore").onclick = () => { knock.clear(); surgery(); };
 if (params.has("stub")) $("btnLoad").textContent = "Load test model";
 drawWordMap();
 if (params.has("autoload")) $("btnLoad").click();

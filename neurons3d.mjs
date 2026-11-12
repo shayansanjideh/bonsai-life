@@ -40,7 +40,8 @@ export class NeuronCloud {
     const ringMat = new THREE.LineBasicMaterial({ color: 0x12161a, transparent: true, opacity: 0.13 });
     const circle = n => { const g = new THREE.BufferGeometry(), p = []; for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; p.push(Math.cos(a), 0, Math.sin(a)); } g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); return g; };
     const cg = circle(96);
-    for (let l = 0; l < map.L; l += 1) { const m = new THREE.Line(cg, ringMat); m.scale.setScalar(map.radius * 1.04); m.position.y = l * map.spacing; scene.add(m); }
+    this.rings = [];
+    for (let l = 0; l < map.L; l += 1) { const m = new THREE.Line(cg, ringMat.clone()); m.scale.setScalar(map.radius * 1.04); m.position.y = l * map.spacing; scene.add(m); this.rings.push(m); }
 
     // neurons
     const S = map.S, g = new THREE.BufferGeometry();
@@ -81,6 +82,9 @@ export class NeuronCloud {
   }
   pickNeuron(i) { this.sel.fill(0); this.picked = i; if (i >= 0) this.sel[i] = 1; this.points.geometry.attributes.aSel.needsUpdate = true; this.onPick?.(i >= 0 ? { s: i, ...this.map.describe(i) } : null); }
   // show one token: z-scores from NeuronMap.activity; the wave climbs the layers over `ms`
+  setKnocked(layers) {                           // layers with a switched-off block get an orange ring
+    this.rings.forEach((m, l) => { const on = layers.has(l); m.material.color.set(on ? 0xff5a1f : 0x12161a); m.material.opacity = on ? 0.95 : 0.13; });
+  }
   show(z, path, { ms = 650 } = {}) {
     for (let s = 0; s < this.map.S; s++) this.target[s] = Math.max(-1, Math.min(1, z[s] / 3));
     this.pathTarget = path; this.t0 = performance.now(); this.waveMs = ms;
