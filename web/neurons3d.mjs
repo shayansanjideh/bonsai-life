@@ -34,7 +34,12 @@ export class NeuronCloud {
     ctl.target.set(0, Hgt / 2, 0); ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.45;
     ctl.minDistance = 4; ctl.maxDistance = 40;
     // the mouse wheel scrolls the page; zoom with a trackpad pinch or ctrl+wheel (both arrive as wheel events with ctrlKey)
-    r.domElement.addEventListener("wheel", e => { if (!e.ctrlKey) e.stopImmediatePropagation(); }, { capture: true });
+    // A pinch sends many tiny deltas (about 1 to 10) and a ctrl+wheel notch one big one (about 100), so each gets its own speed:
+    // roughly 4% per pinch event and 15% per wheel notch. OrbitControls divides the delta by 100 x pixel ratio.
+    r.domElement.addEventListener("wheel", e => {
+      if (!e.ctrlKey) { e.stopImmediatePropagation(); return; }
+      ctl.zoomSpeed = (Math.abs(e.deltaY) < 40 ? 25 : 3) * Math.max(1, devicePixelRatio | 0);
+    }, { capture: true });
     ctl.addEventListener("start", () => { ctl.autoRotate = false; clearTimeout(this.idleT); });
     ctl.addEventListener("end", () => { this.idleT = setTimeout(() => ctl.autoRotate = true, 8000); });
 
