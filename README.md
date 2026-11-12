@@ -18,16 +18,11 @@ Open the hosted page and press **Wake Bonsai in this browser**. Bonsai 2B runs o
 
 Any static HTTPS host works: serve the `web/` folder.
 
-## Brain explorer (`web/brain.html`)
+## Brain explorer
 
-A second page that opens up the model itself, which only works because Bonsai runs on your own GPU:
+The neuron cloud explorer now lives in its own repo, [bonsai-neuron-cloud](https://github.com/shayansanjideh/bonsai-neuron-cloud), at https://shayansanjideh.github.io/bonsai-neuron-cloud/. `web/neurons.html` redirects there.
 
-- **Neuron cloud.** 192 neurons from each of the 24 MLP layers, copied off the GPU after every layer for every word, drawn as a 3D cloud. Dots light up by how far each neuron is from its usual level, and an orange path follows the strongest firing up the stack. Spot-checked against PrismML's llama.cpp (correlation 0.9999).
-- **Word map.** Each word's internal state at a chosen layer, squashed to 2D.
-- **Live odds.** The top 5 candidates and their probabilities at every word.
-- **Surgery.** Switch off the token mixer or the MLP of any layer by zeroing the f16 scale shared by each group of 128 ternary weights. Edits are made in GPU memory and restored bit-exactly. A reference loss (nats per token on a fixed paragraph of easy facts) tracks how much dumber it got, and the text is rewritten so the cloud shows the damage.
-
-Open `brain.html?stub=1` to try the UI with a tiny fake model and no GPU. `node tests/run-tests.cjs` runs the weight-surgery checks on a software WebGPU device (bit-exact restore, only the intended scales change). The older `brain.html` (layer stack, lesion scan, damage sweep, a steering game) still works but is no longer linked.
+The older layer stack page (`web/brain.html`: lesion scan, damage sweep, a steering game) still works here but is not linked. `node tests/run-tests.cjs` runs the weight-surgery checks on a software WebGPU device (bit-exact restore, only the intended scales change).
 
 ## Run it locally with llama-server
 
