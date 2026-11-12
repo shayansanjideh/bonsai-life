@@ -102,6 +102,12 @@
 <script type="module">
 // GitHub Pages lets browsers reuse files for 10 minutes, so a fresh deploy could run with a stale mix of modules.
 // Revalidate the page's own modules first (a cheap "not modified" check when nothing changed), then start.
+// The same goes for this HTML: compare the copy we were loaded from with the server's, and reload once if a newer page is out.
+try {
+  const u = location.href, old = await fetch(u, { cache: "force-cache" }).then(r => r.text());
+  const now = await fetch(u, { cache: "no-cache" }).then(r => r.ok ? r.text() : old);
+  if (now !== old && sessionStorage.getItem("fresh") !== String(now.length)) { sessionStorage.setItem("fresh", String(now.length)); location.reload(); await new Promise(() => {}); }
+} catch {}
 await Promise.all(["neurons-page.mjs", "neurons3d.mjs", "neurons.mjs", "brain-engine.mjs", "instrument.css"].map(f => fetch(f, { cache: "no-cache" }).catch(() => {})));
 await import("./neurons-page.mjs");
 </script>
