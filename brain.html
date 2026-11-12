@@ -3,462 +3,113 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bonsai Brain Explorer</title>
+<title>Bonsai Neuron Cloud</title>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="instrument.css">
-<style>:root{--s1:#12161a;--s2:#ff5a1f;--red:#ff5a1f;--ink:#12161a;--muted:#6c757d}</style>
 </head>
 <body>
 <div class="page">
   <header class="top">
     <div class="nm"><i class="sq"></i>Bonsai / Brain Explorer</div>
-    <a class="tab on" href="brain.html">Layer stack</a>
-    <a class="tab" href="neurons.html">Neuron cloud</a>
-    <a class="tab" href="#scan" data-go="scan">Lesion scan</a>
-    <a class="tab" href="#surgery" data-go="surgery">Surgery</a>
     <div class="model">Ternary-Bonsai-2-2B · 1.58 bit · WebGPU</div>
+    <div class="st"><small>Neurons</small><b id="kN">–</b></div>
+    <div class="st"><small>Token</small><b id="kTok">–</b></div>
     <div class="st"><small>Speed</small><b id="kSpeed">–</b></div>
-    <div class="st"><small>Weights off</small><b id="kOff">0%</b></div>
-    <div class="st"><small>Loss</small><b id="kLoss">–</b></div>
     <div class="st"><small>Status</small><b><span class="status" id="status">Not loaded</span></b></div>
     <div class="ld"><button class="primary" id="btnLoad">Wake Bonsai · 429 MB</button></div>
   </header>
   <div class="progress" id="prog" hidden><i></i></div>
-  <div class="err" id="err" hidden></div>
 
   <div class="grid2">
     <section class="fig panel stage">
-      <div class="hd"><b>Fig. 01</b> Layer stack · 24 layers<span class="r">drag to orbit · click a block to switch it off</span></div>
-      <div class="view" id="b3d"></div>
-      <div class="ov"><h1 class="h1">Look inside a <em>1.58-bit</em> brain.</h1><p class="lede">Ternary-Bonsai-2-2B runs on your GPU in this tab, with every weight set to −1, 0 or +1. Watch what it considers before each word, take another branch, and switch parts of it off.</p></div>
-      <div class="lg"><div><i style="background:#12161a"></i>Full attention</div><div><i style="background:#9aa4aa"></i>Linear attention</div><div><i style="background:#c9d0d4;outline:1px solid #12161a;outline-offset:-1px"></i>MLP</div><div><i style="background:#ff5a1f"></i>Switched off</div><div><i class="path" style="background:#ff5a1f"></i>Residual stream</div></div>
-      <div class="ro" id="b3dFoot">Light runs up the residual stream for every token.</div>
+      <div class="hd"><b>Fig. 01</b> Neuron cloud · 24 layers<span class="r">drag to orbit · pinch to zoom · click a dot</span></div>
+      <div class="view" id="cloud"><div class="fallback" id="cloudMsg">Wake Bonsai to map its neurons.</div></div>
+      <div class="ov"><h1 class="h1">Watch a <em>1.58-bit</em> brain think.</h1></div>
+      <div class="ruler" id="ruler" hidden></div>
+      <div class="ro"><div>Azimuth <b id="rAz">–</b></div><div>Elevation <b id="rEl">–</b></div><div>Shown <b id="rShown">–</b></div><div>Threshold <b>+1.9σ</b></div></div>
+      <div class="lg"><div><i style="background:#ff5a1f"></i>Far above usual</div><div><i style="background:#12161a"></i>Above</div><div><i style="background:#0c8f8a"></i>Below</div><div><i class="path" style="background:#ff5a1f"></i>This word's path</div></div>
+      <div class="stubnote" id="stubNote" hidden>Test model · fake activations</div>
     </section>
-
-    <section class="fig">
-      <div class="hd"><b>Fig. 02</b> Controls<span class="r">surgery · lesion scan · game</span></div>
-      <div class="bd">
-      <div class="seg" id="tabs">
-        <button class="on" data-tab="surgery">Surgery</button>
-        <button data-tab="scan">Lesion scan</button>
-        <button data-tab="game">Make it say it</button>
-      </div>
-
-      <div class="tabpane on" id="tab-surgery">
-        <div class="brain" id="brain"></div>
-        <div class="row">
-          <label>Random damage <input type="range" id="rand" min="0" max="60" step="1" value="0"><span class="val" id="randV">0%</span></label>
+    <div class="col">
+      <section class="fig">
+        <div class="hd"><b>Fig. 02</b> Word map · PCA<span class="r">Layer <b id="wmLayerV">16</b> / <span id="wmLayerMax">23</span></span></div>
+        <div class="bd">
+          <input type="range" id="wmLayer" min="0" max="23" value="16" style="width:100%" aria-label="Layer">
+          <canvas id="wm"></canvas>
+          <p class="hint">Each word's internal state at this layer, squashed to 2D. Words the model treats alike land close together. Low layers group spelling, high layers group meaning.</p>
         </div>
-        <div class="keys">
-          <select id="dmgMode"><option value="zero">Set to 0</option><option value="flip">Flip sign</option></select>
-          <button id="btnReseed" title="New random pattern">Reroll</button>
-          <button class="danger" id="btnRestore">Restore all</button>
+      </section>
+      <section class="fig" id="nbox">
+        <div class="hd"><b>Fig. 03</b> Selected neuron<span class="r">σ above usual level</span></div>
+        <div class="bd">
+          <div class="big" id="nTitle" hidden></div>
+          <canvas id="spark"></canvas>
+          <div class="hint" id="nHint">Click a dot in the cloud to follow one neuron.</div>
+          <div class="tb" id="nToks"></div>
         </div>
-        <label><input type="checkbox" id="autoRewrite" checked> Rewrite the prompt after each edit</label>
-        <div class="stats">
-          <div class="stat"><div class="k">Weights off</div><div class="v" id="mOff">0%</div></div>
-          <div class="stat"><div class="k">Loss now, nats</div><div class="v" id="mLoss">–</div></div>
-          <div class="stat"><div class="k">Intact, nats</div><div class="v" id="mLoss0">–</div></div>
-        </div>
-        <p class="hint">Loss is the average surprise in nats per token on a fixed paragraph of easy facts. Lower is smarter. Damage is applied in groups of 128 weights that share one scale, edited in GPU memory and restored exactly.</p>
-      </div>
-
-      <div class="tabpane" id="tab-scan">
-        <p class="hint">Switch off each block on its own, put it back, and measure how much the loss rises. The blocks it can't live without light up orange in the stack.</p>
-        <div class="keys"><button class="blue" id="btnScan" disabled>Run lesion scan</button><button id="btnSweep" disabled>Damage sweep</button><button id="btnScanStop" disabled>Stop</button></div>
-        <div class="hint" id="scanStat"></div>
-        <div class="legend" id="scanLegend" hidden><span><i style="background:var(--s1)"></i>Mixer off</span><span><i style="background:var(--s2)"></i>MLP off</span></div>
-        <div class="chart" id="scanChart"></div>
-        <details id="scanTableWrap" hidden><summary class="hint">Table view</summary><div id="scanTable"></div></details>
-        <div id="sweepOut"></div>
-      </div>
-
-      <div class="tabpane" id="tab-game">
-        <p class="hint">Steer Bonsai into saying the target. You may only pick from its top 5 tokens at each step. Fewest picks wins, and brain damage is allowed.</p>
-        <div><div class="cap">Target</div><div class="target" id="gTarget">–</div></div>
-        <div class="keys"><button class="blue" id="btnGame" disabled>Start round</button><button id="btnNewTarget">New target</button></div>
-        <input id="gCustom" placeholder="Or type your own target" style="width:100%">
-        <div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><div class="k">Picks</div><div class="v" id="gPicks">0</div></div><div class="stat"><div class="k">Best</div><div class="v" id="gBest">–</div></div></div>
-        <div id="gMsg" class="hint"></div>
-      </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 
   <div class="grid2b">
     <section class="fig">
-      <div class="hd"><b>Write</b><span class="r" id="writeHint">Chat · temp 0 · max 120</span></div>
+      <div class="hd"><b>Write</b><span class="r" id="writeHint">click a word to replay its wave</span></div>
       <div class="bd">
         <div class="row">
           <select id="mode"><option value="chat">Chat</option><option value="raw">Raw text</option></select>
           <label>Temperature <input type="range" id="temp" min="0" max="1.5" step="0.05" value="0" style="width:100px"><span class="val" id="tempV">0</span></label>
-          <label>Max <input type="number" id="maxTok" value="120" min="1" max="1000" style="width:70px"></label>
-          <label><input type="checkbox" id="pickMode"> I pick each token</label>
+          <label>Max <input type="number" id="maxTok" value="60" min="1" max="400" style="width:70px"></label>
+          <label><input type="checkbox" id="slow"> Slow motion</label>
         </div>
-        <textarea id="prompt">Explain in two sentences why the sky is blue.</textarea>
+        <textarea id="prompt">In one sentence each, describe Paris, Tokyo and a banana.</textarea>
         <div class="out" id="out"><span class="prompt">Wake Bonsai, then press Generate.</span></div>
-        <div class="keys"><button class="blue" id="btnGen" disabled>Generate ↵</button><button id="btnStop" disabled>Stop</button><span class="kv">Orange shading shows how surprised it was by its own pick. Click a word to branch.</span></div>
-        <div id="compareWrap" class="compare" hidden>
-          <div class="pair">
-            <div><div class="cap">Intact brain</div><div class="box" id="cmpA"></div></div>
-            <div><div class="cap" id="cmpBLab" style="color:var(--or)">Damaged brain</div><div class="box" id="cmpB"></div></div>
-          </div>
-        </div>
+        <div class="keys"><button class="blue" id="btnGen" disabled>Generate ↵</button><button id="btnStop" disabled>Stop</button><button id="btnReplay" disabled>Replay</button><span class="kv">Prompt words are grey, the model's own words are ink.</span></div>
       </div>
     </section>
     <section class="fig">
-      <div class="hd"><b>Next token</b><span class="r">click to branch</span></div>
-      <div class="bd">
-        <div><div class="cap" id="liveLab">Live</div><div class="cands" id="live"></div></div>
-        <div><div class="cap" id="inspLab">Click a word to inspect it</div><div class="cands" id="insp"></div></div>
-      </div>
+      <div class="hd"><b>Next token</b><span class="r" id="ntHint">what it considered at the selected word</span></div>
+      <div class="bd"><div class="cands" id="live"></div></div>
     </section>
   </div>
-  <div class="foot"><span>Engine: PrismML's WebGPU runtime from their Talk app (Apache-2.0). Weights load once from Hugging Face and stay cached.</span><span><a href="https://github.com/shayansanjideh/bonsai-life">Source</a> · <a href="?stub=1">Test model (no GPU)</a></span></div>
+
+  <section class="fig" id="surgery">
+    <div class="hd"><b>Fig. 04</b> Surgery<span class="r">click a block to switch it off · then Generate again</span></div>
+    <div class="bd">
+      <div class="brain" id="brain"></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Weights off</div><div class="v" id="mOff">0%</div></div>
+        <div class="stat"><div class="k">Loss now, nats</div><div class="v" id="mLoss">–</div></div>
+        <div class="stat"><div class="k">Intact, nats</div><div class="v" id="mLoss0">–</div></div>
+      </div>
+      <div class="keys"><button id="btnRestore" disabled>Restore all</button><span class="kv" id="surgMsg">Mixer blocks mix words together (A = full attention); MLP blocks hold the neurons above.</span></div>
+      <p class="hint">Switching a block off zeroes the scale shared by each group of 128 of its ternary weights, right in GPU memory, so the whole block counts as 0. Restore puts back the exact original bytes. Loss is the average surprise per token on a fixed paragraph of easy facts, so lower is smarter. The cloud keeps comparing against the intact model, so damage shows up as dots far from their usual level, and a switched-off MLP layer goes quiet (its ring turns orange).</p>
+    </div>
+  </section>
+
+  <section class="fig">
+    <div class="hd"><b>Notes</b> What you're looking at</div>
+    <div class="bd how">
+      <div><h3>The dots</h3><p class="hint" id="howDots">Each layer of Bonsai has an MLP with 6,144 neurons. Showing all 147,456 would be a fog, so each layer shows the 192 that vary most on a short warm-up text. Their activations are copied off the GPU after every layer, for every word, and match PrismML's own llama.cpp to a correlation of 0.9999.</p></div>
+      <div><h3>Where they sit</h3><p class="hint">Height is the layer. Around each ring, a neuron's angle comes from which warm-up words make it fire (the first two principal components of its firing pattern), so neurons with similar tastes line up, even across layers. Distance from the centre is spread evenly so every dot is visible.</p></div>
+      <div><h3>Colours, lines and the path</h3><p class="hint">Colour is how far a neuron is from its own usual level on this word: orange is about 2 standard deviations or more above. Lines join each neuron to the neuron in the next layer it most often fires with, and turn orange when both fire. They show correlation, not wiring. The orange path follows the centre of the strongest firing in each layer.</p></div>
+    </div>
+  </section>
+  <div class="foot"><span>Engine: PrismML's WebGPU runtime from their Talk app (Apache-2.0).</span><span><a href="https://github.com/shayansanjideh/bonsai-life">Source</a> · <a href="?stub=1">Test model (no GPU, fake activations)</a></span></div>
 </div>
 <div class="tip" id="tip"></div>
 <script type="module">
-import { loadRealEngine, StubEngine, softmaxTop, logProb, sample } from "./brain-engine.mjs";
-
-const $ = id => document.getElementById(id);
-const params = new URLSearchParams(location.search);
-for (const b of document.querySelectorAll("#tabs button")) b.onclick = () => {
-  for (const x of document.querySelectorAll("#tabs button")) x.classList.toggle("on", x === b);
-  for (const p of document.querySelectorAll(".tabpane")) p.classList.toggle("on", p.id === "tab-" + b.dataset.tab);
-};
-for (const a of document.querySelectorAll(".top a[data-go]")) a.onclick = e => { e.preventDefault(); document.querySelector(`#tabs button[data-tab="${a.dataset.go}"]`)?.click(); document.getElementById("tabs").scrollIntoView({ behavior: "smooth", block: "center" }); };
-if (["#scan", "#surgery", "#game"].includes(location.hash)) setTimeout(() => document.querySelector(`#tabs button[data-tab="${location.hash.slice(1)}"]`)?.click());
-// 3D stack. Shown before the model loads with Bonsai's layout (24 layers, every 4th is full attention).
-let b3d = null, b3dLayers = null;
-async function init3D(layers) {
-  const key = layers.map(l => l.type[0]).join("");
-  if (b3d && b3dLayers === key) return;
-  try {
-    const { Brain3D } = await import("./brain3d.mjs");
-    b3d?.dispose(); $("b3d").innerHTML = "";
-    b3dLayers = key;
-    b3d = new Brain3D($("b3d"), layers, {
-      onToggle: k => { if (!eng) { setStatus("Wake Bonsai first"); return; } dmg.knock.has(k) ? dmg.knock.delete(k) : dmg.knock.add(k); scheduleApply(); },
-      onHover: h => {
-        if (!h) { tip.style.display = "none"; return; }
-        const name = h.part === "mlp" ? "MLP" : h.type === "full" ? "full attention" : "linear attention";
-        tip.innerHTML = `<b>Layer ${h.layer} · ${name}</b><br>${dmg.knock.has(h.key) ? "switched off · click to restore" : "click to switch off"}${h.delta !== undefined ? `<br>lesion: ${h.delta >= 0 ? "+" : ""}${h.delta.toFixed(3)} nats` : ""}`;
-        tip.style.display = "block"; tip.style.left = Math.min(innerWidth - 280, h.x + 14) + "px"; tip.style.top = h.y + 16 + "px";
-      },
-    });
-    b3d.setDamage(dmg.knock, dmg.random);
-    window.b3d = b3d;
-  } catch (e) { console.error(e); $("b3d").innerHTML = `<div class="fallback">3D view unavailable here (${esc(String(e.message || e))}). The controls on the right still work.</div>`; }
-}
-
-const REF_TEXT = "The cat sat on the mat. Water boils at 100 degrees Celsius. The capital of France is Paris, and the capital of Japan is Tokyo. One, two, three, four, five, six, seven, eight.";
-const TARGETS = ["banana", "I am a robot", "purple elephant", "Tokyo", "pizza", "dinosaur", "I love you", "the moon", "sorry"];
-const GAME_PROMPT = "Tell me about your day.";
-
-let eng = null;
-const S = { prompt: [], steps: [], running: false, stop: false, sel: -1, pickResolve: null, game: null };
-const dmg = { knock: new Set(), random: 0, mode: "zero", seed: 1 };
-let intactLoss = null, intact = new Map(), lockTail = Promise.resolve();
-
-let lockDepth = 0;
-function lock(fn) { lockDepth++; if (b3d) b3d.busy = true; const p = lockTail.then(fn, fn).finally(() => { if (--lockDepth === 0 && b3d) b3d.busy = false; }); lockTail = p.catch(() => {}); return p; }
-function setStatus(t, cls = "") { const s = $("status"); s.textContent = t; s.className = "status " + cls; }
-function showErr(e) { const el = $("err"); el.hidden = !e; el.textContent = e ? String(e?.stack || e) : ""; if (e) console.error(e); }
-function pct(x, d = 1) { return (x * 100).toFixed(d) + "%"; }
-const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const vis = s => s === "" ? "∅" : s.replace(/\n/g, "↵").replace(/\t/g, "⇥");
-function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch { return null; } }
-
-// ---------- loading ----------
-$("btnLoad").onclick = async () => {
-  $("btnLoad").disabled = true; showErr(null);
-  try {
-    if (params.has("stub")) { eng = new StubEngine(); }
-    else {
-      $("prog").hidden = false;
-      eng = await loadRealEngine({
-        onProgress: f => { $("prog").firstElementChild.style.width = pct(f); setStatus(`downloading ${Math.round(f * 429)} / 429 MB`); },
-        onStatus: m => setStatus(m.length > 46 ? m.slice(0, 46) + "…" : m),
-      });
-      $("prog").hidden = true;
-    }
-    window.brain = { eng, S, dmg }; // for poking from the console
-    buildBrain(); init3D(eng.layers);
-    setStatus("Ready", "on");
-    $("btnLoad").textContent = "Loaded"; $("btnLoad").closest(".ld")?.setAttribute("hidden", ""); $("btnLoad").classList.remove("primary"); for (const b of ["btnGen", "btnScan", "btnSweep", "btnGame"]) $(b).disabled = false;
-    await lock(async () => { if (eng.surgeon.init) await eng.surgeon.init(); intactLoss = await refLoss(); });
-    $("mLoss0").textContent = intactLoss.toFixed(3); renderLoss(intactLoss);
-  } catch (e) { showErr(e); setStatus("load failed", "err"); $("btnLoad").disabled = false; $("prog").hidden = true; }
-};
-
-// ---------- generation ----------
-function render() {
-  const out = $("out"); const parts = [`<span class="prompt">${esc(S.promptText ?? "")}</span>`];
-  S.steps.forEach((st, i) => {
-    const a = Math.min(0.6, -Math.log10(Math.max(st.p, 1e-6)) * 0.22);
-    const cls = "tok" + (i === S.sel ? " sel" : "") + (st.forked ? " forked" : "") + (st.picked ? " picked" : "");
-    parts.push(`<span class="${cls}" data-i="${i}" style="background:rgba(255,90,31,${(a * 0.8).toFixed(3)})">${esc(eng.piece(st.id))}</span>`);
-  });
-  if (S.running) parts.push('<span class="caret"></span>');
-  out.innerHTML = parts.join("");
-}
-function candHTML(top, chosen, clickable) {
-  return top.map((c, k) => `<button class="cand${c.id === chosen ? " chosen" : ""}${clickable ? "" : " static"}" data-id="${c.id}"><span class="n">${String(k + 1).padStart(2, "0")}</span><span class="t">${esc(vis(eng.piece(c.id)))}</span><span class="track"><span class="bar" style="transform:scaleX(${c.p.toFixed(4)})"></span></span><span class="p">${pct(c.p)}</span></button>`).join("");
-}
-function showLive(top, chosen = -1, picking = false) {
-  $("liveLab").textContent = picking ? "Your pick: choose the next token" : "Next token (live)";
-  $("live").innerHTML = candHTML(top, chosen, picking);
-}
-function inspect(i) {
-  S.sel = i; render();
-  const st = S.steps[i]; if (!st) { $("insp").innerHTML = ""; return; }
-  $("inspLab").textContent = `Token ${i + 1}: it picked "${vis(eng.piece(st.id))}" at ${pct(st.p)}. Click another to fork.`;
-  $("insp").innerHTML = candHTML(st.top, st.id, true);
-}
-$("out").onclick = e => { const t = e.target.closest(".tok"); if (t && !S.running) inspect(+t.dataset.i); };
-$("insp").onclick = e => {
-  const b = e.target.closest(".cand"); if (!b || S.running) return;
-  const id = +b.dataset.id, st = S.steps[S.sel]; if (!st || id === st.id) return;
-  const p = st.top.find(c => c.id === id)?.p ?? 0;
-  S.steps = S.steps.slice(0, S.sel); S.steps.push({ id, top: st.top, p, forked: true, picked: !!S.game });
-  if (S.game) S.game.picks++;
-  run({ resume: true });
-};
-$("live").onclick = e => { const b = e.target.closest(".cand"); if (b && S.pickResolve) S.pickResolve(+b.dataset.id); };
-$("temp").oninput = () => $("tempV").textContent = (+$("temp").value).toFixed(2).replace(/\.?0+$/, "") || "0";
-$("btnGen").onclick = () => run({});
-$("btnStop").onclick = () => { S.stop = true; S.pickResolve?.(null); };
-
-function damaged() { return dmg.knock.size > 0 || dmg.random > 0; }
-function promptKey() { return `${$("mode").value}|${$("maxTok").value}|${$("prompt").value}`; }
-
-async function run({ resume = false }) {
-  if (!eng) return;
-  S.stop = true; S.pickResolve?.(null);
-  return lock(async () => {
-    S.stop = false; S.running = true; showErr(null);
-    $("btnGen").disabled = true; $("btnStop").disabled = false;
-    const chat = $("mode").value === "chat", temp = +$("temp").value, max = Math.max(1, +$("maxTok").value || 120);
-    const pick = $("pickMode").checked;
-    try {
-      if (!resume) {
-        const text = $("prompt").value; if (!text.trim()) throw new Error("Type a prompt first.");
-        S.prompt = eng.encodePrompt(text, chat); S.steps = []; S.sel = -1;
-        S.promptText = chat ? text.trim() + "\n\n" : text;
-        $("insp").innerHTML = ""; $("inspLab").textContent = "Click a token to inspect it";
-      }
-      let logits = await eng.start([...S.prompt, ...S.steps.map(s => s.id)]);
-      if (S.steps.length && eng.stopIds.has(S.steps.at(-1).id)) logits = null;
-      render();
-      const t0 = performance.now(); let n = 0;
-      while (logits && S.steps.length < max && !S.stop) {
-        const { top, logZ } = softmaxTop(logits, 5, 1);
-        let id, picked = false;
-        if (pick || S.game) {
-          showLive(top, -1, true);
-          id = await new Promise(res => S.pickResolve = res); S.pickResolve = null;
-          if (id === null || S.stop) break;
-          picked = true; if (S.game) S.game.picks++;
-        } else { id = sample(logits, temp); showLive(top, id); }
-        S.steps.push({ id, top, p: Math.exp(logits[id] - logZ), picked });
-        b3d?.pulse(S.steps.at(-1).p);
-        render();
-        if (S.game && checkWin()) break;
-        if (eng.stopIds.has(id)) break;
-        logits = await eng.step(id); n++;
-        if (!pick && !S.game && n % 4 === 0) $("kSpeed").textContent = (n / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
-      }
-      if (!pick && !S.game && n > 3) $("kSpeed").textContent = (n / ((performance.now() - t0) / 1000)).toFixed(1) + " tok/s";
-      const text = eng.decode(S.steps.map(s => s.id));
-      const clean = !S.steps.some(s => s.forked || s.picked) && temp === 0 && !S.stop;
-      if (clean && !damaged()) intact.set(promptKey(), text);
-      updateCompare(clean ? text : null);
-    } catch (e) { showErr(e); }
-    finally { S.running = false; $("btnGen").disabled = false; $("btnStop").disabled = true; if (eng) render(); }
-  });
-}
-
-function updateCompare(text) {
-  const a = intact.get(promptKey());
-  const show = damaged() && a !== undefined && text !== null;
-  $("compareWrap").hidden = !show;
-  if (show) { $("cmpA").textContent = a; $("cmpB").textContent = text; $("cmpBLab").textContent = `Damaged brain (${pct(eng.surgeon.damagedFraction(dmg))} of weights off)`; }
-}
-
-// ---------- reference loss ----------
-async function refLoss(stopFlag) {
-  const ids = eng.encodePrompt(REF_TEXT, false);
-  let logits = await eng.start(ids.slice(0, 1)), nll = 0;
-  for (let i = 1; i < ids.length; i++) {
-    if (stopFlag?.stop) return NaN;
-    nll -= logProb(logits, ids[i]);
-    if (i < ids.length - 1) logits = await eng.step(ids[i]);
-  }
-  return nll / (ids.length - 1);
-}
-function renderLoss(L) {
-  const s = Number.isFinite(L) ? L.toFixed(3) : "–";
-  $("mLoss").textContent = s;
-  $("kLoss").textContent = Number.isFinite(L) ? L.toFixed(2) + (intactLoss != null && damaged() ? ` (${L >= intactLoss ? "+" : ""}${(L - intactLoss).toFixed(2)})` : "") : "–";
-}
-
-// ---------- surgery ----------
-function buildBrain() {
-  const L = eng.layers.length, g = $("brain");
-  g.style.gridTemplateColumns = `auto repeat(${L}, minmax(14px, 1fr))`;
-  const h = ['<span></span>', ...eng.layers.map(l => `<span class="lh">${l.i}</span>`)];
-  const r1 = ['<span class="rl">mixer</span>', ...eng.layers.map(l => `<button class="cell${l.type === "full" ? " full" : ""}" data-k="L${l.i}.mixer" title="layer ${l.i} ${l.type === "full" ? "full attention" : "linear attention"}">${l.type === "full" ? "A" : ""}</button>`)];
-  const r2 = ['<span class="rl">MLP</span>', ...eng.layers.map(l => `<button class="cell mlp" data-k="L${l.i}.mlp" title="layer ${l.i} MLP"></button>`)];
-  g.innerHTML = [...h, ...r1, ...r2].join("");
-}
-function paintBrain() {
-  for (const c of $("brain").querySelectorAll(".cell")) c.classList.toggle("off", dmg.knock.has(c.dataset.k));
-  const f = eng ? eng.surgeon.damagedFraction(dmg) : 0;
-  $("mOff").textContent = $("kOff").textContent = pct(f);
-  b3d?.setDamage(dmg.knock, dmg.random);
-}
-let applyTimer = null;
-function scheduleApply() { paintBrain(); clearTimeout(applyTimer); applyTimer = setTimeout(applyDamage, 120); }
-async function applyDamage() {
-  if (!eng) return;
-  S.stop = true; S.pickResolve?.(null);
-  await lock(async () => {
-    try {
-      setStatus("Editing weights…", "busy");
-      await eng.surgeon.apply(dmg);
-      const L = await refLoss(); renderLoss(L);
-      setStatus(damaged() ? `${pct(eng.surgeon.damagedFraction(dmg))} of weights off` : "Ready", damaged() ? "busy" : "on");
-    } catch (e) { showErr(e); setStatus("edit failed", "err"); }
-  });
-  if ($("autoRewrite").checked && !S.game) run({});
-}
-$("brain").onclick = e => {
-  const c = e.target.closest(".cell"); if (!c || !eng) return;
-  const k = c.dataset.k; dmg.knock.has(k) ? dmg.knock.delete(k) : dmg.knock.add(k);
-  scheduleApply();
-};
-$("rand").oninput = () => { $("randV").textContent = $("rand").value + "%"; dmg.random = +$("rand").value / 100; paintBrain(); };
-$("rand").onchange = () => scheduleApply();
-$("dmgMode").onchange = () => { dmg.mode = $("dmgMode").value; scheduleApply(); };
-$("btnReseed").onclick = () => { dmg.seed = (dmg.seed % 1000) + 1; if (dmg.random > 0) scheduleApply(); };
-$("btnRestore").onclick = () => { dmg.knock.clear(); dmg.random = 0; $("rand").value = 0; $("randV").textContent = "0%"; scheduleApply(); };
-
-// ---------- lesion scan & sweep ----------
-const scanFlag = { stop: false };
-$("btnScanStop").onclick = () => scanFlag.stop = true;
-function scanButtons(on) { $("btnScan").disabled = $("btnSweep").disabled = on; $("btnScanStop").disabled = !on; $("btnGen").disabled = on; }
-
-$("btnScan").onclick = async () => {
-  S.stop = true; S.pickResolve?.(null); scanFlag.stop = false; scanButtons(true);
-  const saved = { knock: new Set(dmg.knock), random: dmg.random, mode: dmg.mode, seed: dmg.seed };
-  const res = [];
-  try {
-    await lock(async () => {
-      await eng.surgeon.apply({});
-      const base = await refLoss(); intactLoss ??= base;
-      const jobs = eng.layers.flatMap(l => [["mixer", l.i], ["mlp", l.i]]);
-      const t0 = performance.now();
-      for (let j = 0; j < jobs.length && !scanFlag.stop; j++) {
-        const [part, i] = jobs[j];
-        b3d?.setDamage(new Set([`L${i}.${part}`]), 0); b3d?.focus(`L${i}.${part}`);
-        await eng.surgeon.apply({ knock: new Set([`L${i}.${part}`]), mode: saved.mode });
-        const L = await refLoss(scanFlag); if (scanFlag.stop) break;
-        res.push({ layer: i, part, type: eng.layers[i].type, loss: L, delta: L - base });
-        drawScan(res, eng.layers.length);
-        const eta = (performance.now() - t0) / (j + 1) * (jobs.length - j - 1) / 1000;
-        $("scanStat").textContent = `${j + 1} / ${jobs.length}, about ${Math.ceil(eta)} s left`;
-      }
-      $("scanStat").textContent = scanFlag.stop ? "stopped" : `done. Intact loss ${base.toFixed(3)} nats.`;
-      await eng.surgeon.apply(saved);
-    });
-  } catch (e) { showErr(e); }
-  finally { scanButtons(false); paintBrain(); }
-};
-
-function drawScan(res, nL) {
-  b3d?.setScan(res);
-  $("scanLegend").hidden = false; $("scanTableWrap").hidden = false;
-  const W = Math.max(420, nL * 18 + 50), H = 190, padL = 38, padB = 22, padT = 8;
-  const max = Math.max(0.1, ...res.map(r => r.delta)), min = Math.min(0, ...res.map(r => r.delta));
-  const y = v => padT + (H - padT - padB) * (1 - (v - min) / (max - min));
-  const bw = (W - padL - 4) / nL, half = Math.max(2, (bw - 4) / 2);
-  const ticks = niceTicks(min, max);
-  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Loss increase when each block is knocked out">`;
-  for (const t of ticks) s += `<line x1="${padL}" x2="${W - 4}" y1="${y(t)}" y2="${y(t)}" stroke="#c9d0d4" stroke-width="1"/><text x="${padL - 5}" y="${y(t) + 3.5}" fill="#6c757d" font-size="11" text-anchor="end">${+t.toFixed(2)}</text>`;
-  for (const r of res) {
-    const x = padL + r.layer * bw + 2 + (r.part === "mlp" ? half : 0), y0 = y(0), y1 = y(r.delta);
-    const top = Math.min(y0, y1), h = Math.max(1, Math.abs(y1 - y0));
-    s += `<rect x="${x}" y="${top}" width="${Math.max(1, half - 1)}" height="${h}"  fill="${r.part === "mlp" ? "var(--s2)" : "var(--s1)"}" data-tip="Layer ${r.layer} ${r.part === "mlp" ? "MLP" : (r.type === "full" ? "attention" : "linear attention")} off: loss ${r.loss.toFixed(3)} (${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(3)})"/>`;
-  }
-  for (let i = 0; i < nL; i += nL > 16 ? 2 : 1) s += `<text x="${padL + i * bw + bw / 2}" y="${H - 6}" fill="#6c757d" font-size="11" text-anchor="middle">${i}</text>`;
-  s += `<text x="${padL}" y="${H}" fill="#566275" font-size="0"></text></svg>`;
-  $("scanChart").innerHTML = s + `<div class="hint">Loss increase (nats/token) by layer.</div>`;
-  const sorted = [...res].sort((a, b) => b.delta - a.delta);
-  $("scanTable").innerHTML = `<table class="t"><tr><th>block</th><th>loss</th><th>increase</th></tr>${sorted.map(r => `<tr><td>L${r.layer} ${r.part === "mlp" ? "MLP" : r.type === "full" ? "attention" : "linear attn"}</td><td class="n">${r.loss.toFixed(3)}</td><td class="n">${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(3)}</td></tr>`).join("")}</table>`;
-}
-function niceTicks(a, b) { const span = b - a, step = Math.pow(10, Math.floor(Math.log10(span / 3))); const m = [1, 2, 5, 10].find(m => span / (m * step) <= 5) * step; const out = []; for (let v = Math.ceil(a / m) * m; v <= b + 1e-9; v += m) out.push(v); return out; }
-const tip = $("tip");
-document.addEventListener("mousemove", e => { if (e.target.closest?.("#b3d")) return; const t = e.target.closest?.("[data-tip]"); if (!t) { tip.style.display = "none"; return; } tip.textContent = t.dataset.tip; tip.style.display = "block"; tip.style.left = Math.min(innerWidth - 270, e.clientX + 12) + "px"; tip.style.top = e.clientY + 14 + "px"; });
-
-$("btnSweep").onclick = async () => {
-  S.stop = true; S.pickResolve?.(null); scanFlag.stop = false; scanButtons(true);
-  const saved = { knock: new Set(dmg.knock), random: dmg.random, mode: dmg.mode, seed: dmg.seed };
-  const levels = [0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5];
-  const prompt = "Once upon a time";
-  const rows = [];
-  try {
-    await lock(async () => {
-      for (const lv of levels) {
-        if (scanFlag.stop) break;
-        $("scanStat").textContent = `damage ${pct(lv, 0)}…`;
-        await eng.surgeon.apply({ random: lv, mode: saved.mode, seed: 1 });
-        const L = await refLoss(scanFlag); if (scanFlag.stop) break;
-        let logits = await eng.start(eng.encodePrompt(prompt, false)); const ids = [];
-        for (let i = 0; i < 24 && !scanFlag.stop; i++) { const id = sample(logits, 0); ids.push(id); if (eng.stopIds.has(id)) break; logits = await eng.step(id); }
-        rows.push({ lv, L, text: prompt + eng.decode(ids) });
-        $("sweepOut").innerHTML = `<table class="t"><tr><th>weights off</th><th>loss</th><th>greedy continuation</th></tr>${rows.map(r => `<tr><td class="n">${pct(r.lv, 0)}</td><td class="n">${r.L.toFixed(2)}</td><td>${esc(r.text)}</td></tr>`).join("")}</table>`;
-      }
-      $("scanStat").textContent = scanFlag.stop ? "stopped" : `sweep done (mode: ${saved.mode === "flip" ? "flip sign" : "set to 0"})`;
-      await eng.surgeon.apply(saved);
-    });
-  } catch (e) { showErr(e); }
-  finally { scanButtons(false); }
-};
-
-// ---------- game ----------
-let target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
-function showTarget() { $("gTarget").textContent = target; const b = store("brain.best." + target); $("gBest").textContent = b ? `${b} picks` : "–"; }
-showTarget();
-$("btnNewTarget").onclick = () => { $("gCustom").value = ""; let t; do t = TARGETS[Math.floor(Math.random() * TARGETS.length)]; while (t === target); target = t; showTarget(); };
-$("gCustom").onchange = () => { const v = $("gCustom").value.trim(); if (v) { target = v; showTarget(); } };
-$("btnGame").onclick = () => {
-  if (!eng) return;
-  S.game = { picks: 0, target };
-  $("prompt").value = GAME_PROMPT; $("mode").value = "chat"; $("maxTok").value = 60;
-  $("gMsg").textContent = "Pick tokens in the Next token list. Click an earlier token to fork (that costs a pick).";
-  $("gPicks").textContent = "0";
-  run({}).then(() => { if (S.game && !S.game.won) { $("gMsg").textContent = "Round over. Start again or fork from an earlier token."; } });
-};
-function checkWin() {
-  $("gPicks").textContent = S.game.picks;
-  const text = eng.decode(S.steps.map(s => s.id)).toLowerCase();
-  if (!text.includes(S.game.target.toLowerCase())) return false;
-  S.game.won = true;
-  const best = store("brain.best." + S.game.target);
-  if (!best || S.game.picks < best) store("brain.best." + S.game.target, S.game.picks);
-  $("gMsg").innerHTML = `<span class="win">It said "${esc(S.game.target)}" in ${S.game.picks} picks${dmg.knock.size || dmg.random ? ` with ${pct(eng.surgeon.damagedFraction(dmg))} of its weights off` : ""}.</span>`;
-  showTarget(); S.game = null; $("live").innerHTML = "";
-  return true;
-}
-$("pickMode").onchange = () => { if (!$("pickMode").checked) S.game = null; };
-$("btnStop").addEventListener("click", () => { if (S.game) { S.game = null; $("gMsg").textContent = "Round stopped."; } });
-
-if (params.has("stub")) { $("btnLoad").textContent = "Load stub model"; }
-init3D(Array.from({ length: 24 }, (_, i) => ({ i, type: (i + 1) % 4 === 0 ? "full" : "linear" })));
-if (params.has("autoload")) $("btnLoad").click();
+// GitHub Pages lets browsers reuse files for 10 minutes, so a fresh deploy could run with a stale mix of modules.
+// Revalidate the page's own modules first (a cheap "not modified" check when nothing changed), then start.
+// The same goes for this HTML: compare the copy we were loaded from with the server's, and reload once if a newer page is out.
+try {
+  const u = location.href, old = await fetch(u, { cache: "force-cache" }).then(r => r.text());
+  const now = await fetch(u, { cache: "no-cache" }).then(r => r.ok ? r.text() : old);
+  if (now !== old && sessionStorage.getItem("fresh") !== String(now.length)) { sessionStorage.setItem("fresh", String(now.length)); location.reload(); await new Promise(() => {}); }
+} catch {}
+await Promise.all(["neurons-page.mjs", "neurons3d.mjs", "neurons.mjs", "brain-engine.mjs", "instrument.css"].map(f => fetch(f, { cache: "no-cache" }).catch(() => {})));
+await import("./neurons-page.mjs");
 </script>
-
 </body>
 </html>

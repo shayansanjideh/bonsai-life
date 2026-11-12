@@ -1,4 +1,4 @@
-// 3D view of Bonsai's layer stack for brain.html: one flat disc per block, the token mixer on the left and the MLP on
+// 3D view of Bonsai's layer stack for layers.html: one flat disc per block, the token mixer on the left and the MLP on
 // the right, threaded on an orange residual stream. Click a block to knock it out. Pulses run up the stack for every
 // generated token, damage dims and reddens blocks, and lesion-scan results light blocks by how much they matter.
 import * as THREE from "three";
