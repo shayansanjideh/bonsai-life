@@ -21,6 +21,7 @@ const WARMUP = [
 let eng = null, map = null, cloud = null, wm = null, dims = null;
 // one entry per traced token: { id, piece, prompt, z (Float32Array S), path (Float32Array L*3) }
 let toks = [], cur = -1, picked = -1, busy = false, stopFlag = false;
+let stoppedAtOnce = false;                        // set when a generation ends before writing anything
 
 $("btnLoad").onclick = async () => {
   $("btnLoad").disabled = true;
@@ -151,14 +152,20 @@ function hiddenToks() {
   toks.forEach((t, i) => {
     if (isTag(t.piece)) h.add(i);
     else if (i > 0 && /<\|im_start\|>/.test(toks[i - 1].piece)) h.add(i);             // role name after <|im_start|>
-    else if (!t.piece.trim() && (h.has(i - 1) || (toks[i + 1] && isTag(toks[i + 1].piece)))) h.add(i);
+    else if (t.prompt && !t.piece.trim() && (h.has(i - 1) || (toks[i + 1] && isTag(toks[i + 1].piece)))) h.add(i);
   });
   return h;
+}
+function blankNote() {                             // a damaged model can answer with nothing, or only blank lines: say so
+  const gen = toks.filter(t => !t.prompt);
+  if (stoppedAtOnce) return '<br><span class="hint">It ended its answer straight away without writing anything: its top choice was the end-of-answer token.</span>';
+  if (gen.length && gen.every(t => !t.piece.trim() || isTag(t.piece))) return `<br><span class="hint">It wrote only ${gen.length} blank line${gen.length > 1 ? "s" : ""} or tags, then ${gen.length >= +$("maxTok").value ? "hit the word limit" : "stopped"}.</span>`;
+  return "";
 }
 function renderText() {
   const h = hiddenToks();
   let lastPrompt = false;
-  $("out").innerHTML = toks.map((t, i) => { if (h.has(i)) return ""; const br = lastPrompt && !t.prompt ? "<br>" : ""; lastPrompt = t.prompt; return br + `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`; }).join("") + (busy ? '<span class="caret"></span>' : stoppedAtOnce ? '<br><span class="hint">It ended its answer straight away without writing anything: its top choice was the end-of-answer token.</span>' : "");
+  $("out").innerHTML = toks.map((t, i) => { if (h.has(i)) return ""; const br = lastPrompt && !t.prompt ? "<br>" : ""; lastPrompt = t.prompt; return br + `<span class="tok${t.prompt ? " pr" : ""}${i === cur ? " cur" : ""}" data-i="${i}">${esc(t.piece)}</span>`; }).join("") + (busy ? '<span class="caret"></span>' : blankNote());
 }
 $("out").onclick = e => { const el = e.target.closest(".tok"); if (!el || busy) return; focusTok(+el.dataset.i); };
 function renderNext() {
@@ -183,7 +190,6 @@ function addTok(id, trace, prompt, cands) {
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-let stoppedAtOnce = false;
 $("btnGen").onclick = async () => {
   if (busy) return; busy = true; stopFlag = false; stoppedAtOnce = false;
   for (const b of ["btnGen", "btnReplay", "btnLoad"]) $(b).disabled = true; $("btnStop").disabled = false;
