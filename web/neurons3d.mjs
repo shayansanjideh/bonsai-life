@@ -33,6 +33,8 @@ export class NeuronCloud {
     const ctl = this.controls = new OrbitControls(cam, r.domElement);
     ctl.target.set(0, Hgt / 2, 0); ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.45;
     ctl.minDistance = 4; ctl.maxDistance = 40;
+    // the mouse wheel scrolls the page; zoom with a trackpad pinch or ctrl+wheel (both arrive as wheel events with ctrlKey)
+    r.domElement.addEventListener("wheel", e => { if (!e.ctrlKey) e.stopImmediatePropagation(); }, { capture: true });
     ctl.addEventListener("start", () => { ctl.autoRotate = false; clearTimeout(this.idleT); });
     ctl.addEventListener("end", () => { this.idleT = setTimeout(() => ctl.autoRotate = true, 8000); });
 
