@@ -1,4 +1,4 @@
-// Engine layer for the brain explorer (brain.html, and the older layers.html).
+// Engine layer for the brain explorer (brain.html).
 // RealEngine drives Ternary-Bonsai-2-2B through PrismML's WebGPU engine (vendor/bonsai.mjs) one token at a time,
 // reading the full next-token distribution after every step. Surgeon edits the model's ternary weights in GPU
 // memory. StubEngine is a tiny fake model with the same interface, for testing the page without a GPU.
