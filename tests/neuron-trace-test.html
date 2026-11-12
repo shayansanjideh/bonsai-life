@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>Neuron trace: real model test</title><pre id="o">starting</pre>
+<script type="module">
+// Checks the activation tap (brain-engine.mjs Tracer) against the real Ternary-Bonsai-2-2B. Downloads 429 MB.
+// 1. tracing must not change the model: traced and untraced greedy text and logits are identical
+// 2. traces are real: neurons vary, the residual changes from layer to layer, different words give different traces
+// 3. the NeuronMap builds and reports how many neurons are live. Results go to window.result.
+import { loadRealEngine, sample } from "../web/brain-engine.mjs";
+import { NeuronMap, WordMap } from "../web/neurons.mjs";
+const R = { steps: [], checks: [] }, o = document.getElementById("o");
+const log = (k, v) => { R.steps.push([k, v]); o.textContent = R.steps.map(([a, b]) => `${a}: ${typeof b === "string" ? b : JSON.stringify(b)}`).join("\n"); console.log(k, v); };
+const check = (ok, name, detail) => { R.checks.push({ ok, name, detail }); log((ok ? "PASS " : "FAIL ") + name, detail ?? ""); };
+try {
+  const eng = await loadRealEngine({ onStatus: m => log("load", m) }); const d = eng.traceDims; log("dims", d);
+  const ids = eng.encodePrompt("The capital of France is Paris, and the capital of Japan is", false);
+  // untraced reference
+  let lg = await eng.start(ids); const plain = []; for (let i = 0; i < 8; i++) { const id = sample(lg, 0); plain.push(id); lg = await eng.step(id); }
+  const plainLast = lg;
+  // traced
+  const traces = []; let tl = await eng.startTraced(ids, (i, t) => traces.push(t)); const traced = [];
+  for (let i = 0; i < 8; i++) { const id = sample(tl, 0); traced.push(id); const r = await eng.stepTraced(id); traces.push(r.trace); tl = r.logits; }
+  log("untraced", eng.decode(plain)); log("traced", eng.decode(traced));
+  check(plain.join() === traced.join(), "tracing does not change the generated text");
+  let maxd = 0; for (let i = 0; i < tl.length; i++) maxd = Math.max(maxd, Math.abs(tl[i] - plainLast[i]));
+  log("logit max |diff| traced vs untraced (prefill vs token-by-token)", maxd);
+  check(maxd < 0.5, "traced logits match untraced closely", maxd);
+  const t = traces.at(-1); let nz = 0; for (const x of t.neurons) if (x !== 0) nz++;
+  check(nz / t.neurons.length > 0.5, "MLP activations are non-zero", `${(nz / t.neurons.length * 100).toFixed(1)}%`);
+  const H = d.H, rn = l => Math.hypot(...t.resid.subarray(l * H, (l + 1) * H));
+  log("residual norm by layer", Array.from({ length: d.L }, (_, l) => +rn(l).toFixed(1)));
+  let same = 0; for (let l = 1; l < d.L; l++) { let diff = 0; for (let i = 0; i < H; i++) diff += Math.abs(t.resid[l * H + i] - t.resid[(l - 1) * H + i]); if (diff === 0) same++; }
+  check(same === 0, "residual changes at every layer", same);
+  let dd = 0; const a = traces[2].neurons, b = traces[5].neurons; for (let i = 0; i < a.length; i++) dd += Math.abs(a[i] - b[i]);
+  check(dd > 0, "different words give different traces", dd);
+  const nm = new NeuronMap(d, { perLayer: 192 }), wm = new WordMap(d); traces.forEach((tr, i) => { nm.addCalibration(tr.neurons); wm.add(String(i), tr.resid); });
+  nm.build(); log("map", { S: nm.S, edges: nm.edges.length, live: nm.live });
+  check(nm.S === d.L * 192 && nm.pos.every(Number.isFinite), "neuron map builds");
+  check(wm.project(16).every(p => Number.isFinite(p.x)), "word map projects");
+  R.done = true; R.failed = R.checks.some(c => !c.ok);
+} catch (e) { log("ERROR", String(e?.stack || e)); R.error = String(e?.stack || e); R.done = true; R.failed = true; }
+window.result = R;
+</script>
