@@ -15,11 +15,11 @@ def sh(cmd, timeout=900):
     if out.strip(): log(out)
     return r.returncode
 
-FILES = ["web/brain-engine.mjs", "web/naturalist.mjs", "web/neurons.mjs", "web/vendor/bonsai.mjs", "tests/real-model-test.html", "tests/neuron-trace-test.html", "tests/trace-dump.html"]
+FILES = ["web/brain-engine.mjs", "web/naturalist.mjs", "web/neurons.mjs", "web/vendor/bonsai.mjs", "tests/real-model-test.html", "tests/neuron-trace-test.html", "tests/trace-dump.html", "tests/surgery-trace-test.html"]
 # Which test page to run. TEST=neuron runs the activation-tap self-test (minutes); TEST=brain runs the surgery test and,
 # on a real GPU, the 6-passage lesion scan (far too slow for the CPU fallback, so it runs in quick mode there).
 TEST = os.environ.get("BONSAI_TEST", "neuron")
-PAGE = {"neuron": "tests/neuron-trace-test.html", "brain": "tests/real-model-test.html", "truth": "tests/trace-dump.html"}[TEST]
+PAGE = {"neuron": "tests/neuron-trace-test.html", "brain": "tests/real-model-test.html", "truth": "tests/trace-dump.html", "surgery": "tests/surgery-trace-test.html"}[TEST]
 TRUTH_PROMPT = "The capital of France is Paris, and the capital of Japan is"
 
 # ---- TEST=truth: ground truth from PrismML's llama.cpp (CPU), via llama-eval-callback's tensor dumps ----
@@ -174,7 +174,7 @@ def main():
             json.dump({"adapter": info, "result": res, "text": text, "seconds": time.time() - t0}, open(os.path.join(W, f"result_{name}.json"), "w"), indent=1)
             summary[name] = {"adapter": info, "done": bool(res and res.get("done")), "failed": res.get("failed") if res else None, "seconds": round(time.time() - t0)}
             b.close()
-            if res and res.get("done") and not res.get("failed") and (res.get("scan") or TEST in ("neuron", "truth")): break  # done on the GPU, no need for the fallback
+            if res and res.get("done") and not res.get("failed") and (res.get("scan") or TEST in ("neuron", "truth", "surgery")): break  # done on the GPU, no need for the fallback
     srv.kill()
     if TEST == "truth":
         web = next((json.load(open(f))["result"] for f in sorted(glob.glob(os.path.join(W, "result_*.json"))) if (json.load(open(f)).get("result") or {}).get("ids")), None)
