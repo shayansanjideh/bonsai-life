@@ -1,4 +1,4 @@
-// neurons.html: load Bonsai, map a sample of its neurons on a warm-up text, then trace every word it reads or writes.
+// brain.html: load Bonsai, map a sample of its neurons on a warm-up text, then trace every word it reads or writes.
 import { loadRealEngine, StubEngine, sample, softmaxTop, logProb } from "./brain-engine.mjs";
 import { NeuronMap, WordMap } from "./neurons.mjs";
 

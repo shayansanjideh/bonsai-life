@@ -1,4 +1,4 @@
-// Stub-model UI test for web/neurons.html: load, map neurons, generate, click a word and a neuron. No GPU needed.
+// Stub-model UI test for web/brain.html: load, map neurons, generate, click a word and a neuron. No GPU needed.
 // THREE_DIR=<unpacked three@0.160.0> serves three.js locally when unpkg is unreachable. SHOT_DIR=<dir> saves screenshots.
 const { chromium } = require("playwright"); const { spawn } = require("child_process"); const path = require("path");
 (async () => {
@@ -10,7 +10,7 @@ const { chromium } = require("playwright"); const { spawn } = require("child_pro
     const p = await b.newPage({ viewport: { width: 1440, height: 1000 } }); const errs = [];
     p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && (process.env.THREE_DIR || !/three|unpkg/.test(m.text()))) errs.push(m.text()); });
     if (process.env.THREE_DIR) await p.route("https://unpkg.com/three@0.160.0/**", r => r.fulfill({ path: path.join(process.env.THREE_DIR, r.request().url().split("three@0.160.0/")[1]), contentType: "application/javascript" }));
-    await p.goto("http://127.0.0.1:8783/web/neurons.html?stub=1");
+    await p.goto("http://127.0.0.1:8783/web/brain.html?stub=1");
     await p.click("#btnLoad"); await p.waitForFunction(() => !document.getElementById("btnGen").disabled, null, { timeout: 90000 }).catch(e => { throw new Error(e.message + " errors: " + errs.join(" / ") + " status: "); });
     await p.click("#btnGen"); await p.waitForFunction(() => !document.getElementById("btnGen").disabled, null, { timeout: 180000 });
     const st = await p.evaluate(() => ({ toks: cloudState.toks.length, S: cloudState.map.S, edges: cloudState.map.edges.length, live: cloudState.map.live, wm: document.getElementById("wm").width }));
