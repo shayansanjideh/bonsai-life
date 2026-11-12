@@ -99,6 +99,11 @@
   <div class="foot"><span>Engine: PrismML's WebGPU runtime from their Talk app (Apache-2.0).</span><span><a href="https://github.com/shayansanjideh/bonsai-life">Source</a> · <a href="?stub=1">Test model (no GPU, fake activations)</a></span></div>
 </div>
 <div class="tip" id="tip"></div>
-<script type="module" src="neurons-page.mjs"></script>
+<script type="module">
+// GitHub Pages lets browsers reuse files for 10 minutes, so a fresh deploy could run with a stale mix of modules.
+// Revalidate the page's own modules first (a cheap "not modified" check when nothing changed), then start.
+await Promise.all(["neurons-page.mjs", "neurons3d.mjs", "neurons.mjs", "brain-engine.mjs", "instrument.css"].map(f => fetch(f, { cache: "no-cache" }).catch(() => {})));
+await import("./neurons-page.mjs");
+</script>
 </body>
 </html>
