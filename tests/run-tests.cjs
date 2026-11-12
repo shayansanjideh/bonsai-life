@@ -21,7 +21,7 @@ const path = require("path");
     ui.on("pageerror", e => uerr.push(String(e))); ui.on("console", m => { if (m.type() === "error") uerr.push(m.text()); });
     // three.js for the 3D view: serve it from a local copy when THREE_DIR points at an unpacked three@0.160.0 package
     if (process.env.THREE_DIR) await ui.route("https://unpkg.com/three@0.160.0/**", r => r.fulfill({ path: path.join(process.env.THREE_DIR, r.request().url().split("three@0.160.0/")[1]), contentType: "application/javascript" }));
-    await ui.goto("http://127.0.0.1:8777/web/layers.html?stub=1&autoload=1");
+    await ui.goto("http://127.0.0.1:8777/web/brain.html?stub=1&autoload=1");
     await ui.waitForFunction(() => /\d/.test(document.getElementById("mLoss0").textContent), null, { timeout: 90000 });
     await ui.click("#btnGen"); await ui.waitForFunction(() => document.getElementById("btnGen").disabled === false && document.querySelectorAll(".tok").length > 3, null, { timeout: 90000 });
     const n1 = await ui.locator(".tok").count();
