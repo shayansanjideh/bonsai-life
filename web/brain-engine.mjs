@@ -385,10 +385,13 @@ export class StubEngine {
     const n = this.ctx.length, cur = this.#vec(1000 + this.ctx[n - 1], D), ctx = new Float32Array(D);
     for (let k = 2; k <= Math.min(6, n); k++) { const e = this.#vec(1000 + this.ctx[n - k], D); for (let d = 0; d < D; d++) ctx[d] += e[d] / k; }
     const neurons = new Float32Array(L * F), resid = new Float32Array(L * H), x = new Float32Array(D);
+    // fake damage: a switched-off MLP has silent neurons, and anything switched off scrambles the layers above it
+    const knock = this.spec.knock ?? new Set(), noise = this.#vec(7 + n, D, 1.4); let hurt = (this.spec.random ?? 0) * 2;
     for (let l = 0; l < L; l++) {
       const a = l / (L - 1);
-      for (let d = 0; d < D; d++) x[d] = (1 - a) * cur[d] + a * ctx[d] * 1.6;
-      for (let j = 0; j < F; j++) { let z = 0; const o = (l * F + j) * D; for (let d = 0; d < D; d++) z += this.tw.n[o + d] * x[d]; z = z * 0.9 - 1.2; neurons[l * F + j] = z / (1 + Math.exp(-z)); }
+      if (knock.has(`L${l}.mixer`) || knock.has(`L${l}.mlp`)) hurt += 0.5;
+      for (let d = 0; d < D; d++) x[d] = (1 - a) * cur[d] + a * ctx[d] * 1.6 + Math.min(1.5, hurt) * noise[d];
+      for (let j = 0; j < F; j++) { let z = 0; const o = (l * F + j) * D; for (let d = 0; d < D; d++) z += this.tw.n[o + d] * x[d]; z = z * 0.9 - 1.2; neurons[l * F + j] = knock.has(`L${l}.mlp`) ? 0 : z / (1 + Math.exp(-z)); }
       for (let i = 0; i < H; i++) { let z = 0; for (let d = 0; d < D; d++) z += this.tw.h[i * D + d] * x[d]; resid[l * H + i] = z * (1 + l * 0.1); }
     }
     return { neurons, resid };

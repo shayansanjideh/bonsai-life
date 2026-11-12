@@ -16,9 +16,16 @@ const { chromium } = require("playwright"); const { spawn } = require("child_pro
     const st = await p.evaluate(() => ({ toks: cloudState.toks.length, S: cloudState.map.S, edges: cloudState.map.edges.length, live: cloudState.map.live, wm: document.getElementById("wm").width }));
     await p.click('.tok[data-i="20"]'); await p.waitForTimeout(800);
     const cur = await p.evaluate(() => document.querySelector(".tok.cur")?.dataset.i);
-    if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, "neurons.png") });
-    console.log("neurons UI:", JSON.stringify({ ...st, cur }), "errors:", errs.slice(0, 3));
-    fail = st.toks < 20 || st.S < 100 || st.edges < 10 || cur !== "20" || errs.length > 0;
+    // surgery: switch off layer 5's MLP; the text is rewritten and that layer's sampled neurons go quiet
+    await p.click('#brain .cell[data-k="L5.mlp"]');
+    await p.waitForFunction(() => document.getElementById("mLoss").textContent.includes("(") && !document.getElementById("btnGen").disabled, null, { timeout: 180000 });
+    const sg = await p.evaluate(() => { const { map, toks } = cloudState, t = toks.at(-1), K = map.K; let quiet = 0;
+      for (let k = 0; k < K; k++) if (Math.abs(t.z[5 * K + k] * map.std[5 * K + k] + map.mean[5 * K + k]) < 1e-6) quiet++;
+      return { off: document.getElementById("mOff").textContent, loss: document.getElementById("mLoss").textContent, quiet: quiet / K, toks: toks.length }; });
+    if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, "neurons.png"), fullPage: true });
+    await p.click("#btnRestore"); await p.waitForFunction(() => !document.getElementById("mLoss").textContent.includes("(") && !document.getElementById("btnGen").disabled, null, { timeout: 180000 });
+    console.log("neurons UI:", JSON.stringify({ ...st, cur, surgery: sg }), "errors:", errs.slice(0, 3));
+    fail = st.toks < 20 || st.S < 100 || st.edges < 10 || cur !== "20" || sg.quiet < 0.99 || sg.toks < 10 || errs.length > 0;
   } catch (e) { console.log("FAIL", e.message); fail = true; }
   await b.close(); srv.kill(); console.log(fail ? "FAIL neurons UI" : "PASS neurons UI"); process.exit(fail ? 1 : 0);
 })();
