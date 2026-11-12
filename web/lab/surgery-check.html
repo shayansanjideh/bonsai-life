@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>Surgery on the real model</title><style>body{font:14px/1.5 ui-monospace,Menlo,monospace;margin:24px;background:#f8faf9;color:#12161a}pre{white-space:pre-wrap}</style><pre id="o">starting</pre>
+<script type="module">
+// Checks the neuron page's surgery path against the real Ternary-Bonsai-2-2B (brain-engine.mjs Surgeon + Tracer). Downloads 429 MB.
+// 1. switching off L5's MLP silences every L5 neuron in the tap
+// 2. switching off both of L5's blocks passes the residual through L5 unchanged
+// 3. switching off L9's mixer changes the loss vs the intact model
+// 4. Restore all gives bit-identical logits, neurons and residual to the intact model. Results go to window.result.
+import { loadRealEngine, logProb } from "../brain-engine.mjs";
+const R = { steps: [], checks: [] }, o = document.getElementById("o");
+const log = (k, v) => { R.steps.push([k, v]); o.textContent = R.steps.map(([a, b]) => `${a}: ${typeof b === "string" ? b : JSON.stringify(b)}`).join("\n"); console.log(k, v); };
+const check = (ok, name, detail) => { R.checks.push({ ok, name, detail }); log((ok ? "PASS " : "FAIL ") + name, detail ?? ""); };
+const maxDiff = (a, b) => { let m = 0; for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i] - b[i])); return m; };
+try {
+  const eng = await loadRealEngine({ onStatus: m => log("load", m) }); const { L, H, F } = eng.traceDims; log("dims", { L, H, F });
+  const ids = eng.encodePrompt("The capital of France is Paris.", false); log("tokens", ids.length);
+  const run = async () => { let last = null, lg = await eng.startTraced(ids, (i, t) => { last = t; }); return { t: last, lg: Float32Array.from(lg) }; };
+  const loss = async () => { let lg = await eng.start(ids.slice(0, 1)), nll = 0; for (let i = 1; i < ids.length; i++) { nll -= logProb(lg, ids[i]); if (i < ids.length - 1) lg = await eng.step(ids[i]); } return nll / (ids.length - 1); };
+  await eng.surgeon.init();
+  const base = await run(), baseLoss = await loss(); log("intact loss", baseLoss);
+  // 1
+  await eng.surgeon.apply({ knock: new Set(["L5.mlp"]) });
+  const a = await run(); let nz = 0, mx = 0; for (let j = 0; j < F; j++) { const v = a.t.neurons[5 * F + j]; if (v !== 0) nz++; mx = Math.max(mx, Math.abs(v)); }
+  let nz4 = 0; for (let j = 0; j < F; j++) if (a.t.neurons[4 * F + j] !== 0) nz4++;
+  check(nz === 0, "L5 MLP off: every L5 neuron is exactly 0", { nonzero: nz, maxAbs: mx, layer4NonzeroForContrast: nz4 });
+  // 2
+  await eng.surgeon.apply({ knock: new Set(["L5.mlp", "L5.mixer"]) });
+  const b = await run(); const pass = maxDiff(b.t.resid.subarray(5 * H, 6 * H), b.t.resid.subarray(4 * H, 5 * H));
+  const intactStep = maxDiff(base.t.resid.subarray(5 * H, 6 * H), base.t.resid.subarray(4 * H, 5 * H));
+  check(pass < 1e-4, "L5 mixer + MLP off: residual passes through L5 unchanged", { maxAbsDiffL4toL5: pass, intactForContrast: intactStep });
+  // 3
+  await eng.surgeon.apply({ knock: new Set(["L9.mixer"]) });
+  const mixLoss = await loss(), c = await run();
+  check(Math.abs(mixLoss - baseLoss) > 0.01 && maxDiff(c.lg, base.lg) > 0, "L9 mixer off: loss changes vs intact", { intact: baseLoss, damaged: mixLoss, delta: mixLoss - baseLoss, weightsOff: eng.surgeon.damagedFraction({ knock: new Set(["L9.mixer"]) }) });
+  // 4
+  await eng.surgeon.apply({});
+  const r = await run(), rLoss = await loss();
+  check(maxDiff(r.lg, base.lg) === 0 && maxDiff(r.t.neurons, base.t.neurons) === 0 && maxDiff(r.t.resid, base.t.resid) === 0 && rLoss === baseLoss, "Restore all: logits, neurons and residual bit-identical to intact", { logits: maxDiff(r.lg, base.lg), neurons: maxDiff(r.t.neurons, base.t.neurons), resid: maxDiff(r.t.resid, base.t.resid), loss: rLoss - baseLoss });
+  R.done = true; R.failed = R.checks.some(c => !c.ok);
+} catch (e) { log("ERROR", String(e?.stack || e)); R.error = String(e?.stack || e); R.done = true; R.failed = true; }
+window.result = R;
+</script>
